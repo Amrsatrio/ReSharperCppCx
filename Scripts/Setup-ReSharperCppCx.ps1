@@ -117,7 +117,7 @@ function Ensure-IlSpy {
     $patchSha256 = Get-Sha256 -Path $patchPath
     if (-not (Test-Path -LiteralPath $sourceDirectory -PathType Container)) {
         $null = Invoke-PatchNative -FilePath 'git' -Arguments @(
-            'clone', '--branch', $tag, '--single-branch', '--recurse-submodules',
+            'clone', '--branch', $tag, '--single-branch',
             $repository, $sourceDirectory
         ) -WorkingDirectory $ToolRoot
     }
