@@ -1,0 +1,15 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppQualifiedId.cs b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppQualifiedId.cs
+index 6943da3f77fc3e8084bf24357bdb88f3b59cf4bc..30cecc679bd55bd882ef6c4597b75d3b05033b39 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppQualifiedId.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppQualifiedId.cs
+@@ -94,6 +94,10 @@ public struct CppQualifiedId(string name)
+ 
+ 	public static readonly CppQualifiedId Rs__func__ = new CppQualifiedId("__func__");
+ 
++	public static readonly CppQualifiedId PLATFORM_NAME = new CppQualifiedId("Platform"); // @MOD C++/CX
++	public static readonly CppQualifiedId DELEGATE_NAME = new CppQualifiedId("Delegate"); // @MOD C++/CX
++	public static readonly CppQualifiedId WRITE_ONLY_ARRAY_NAME = new CppQualifiedId("WriteOnlyArray"); // @MOD C++/CX
++
+ 	public string Name { get; } = name;
+ 
+ 	public bool Equals(CppQualifiedNamePart rhs)

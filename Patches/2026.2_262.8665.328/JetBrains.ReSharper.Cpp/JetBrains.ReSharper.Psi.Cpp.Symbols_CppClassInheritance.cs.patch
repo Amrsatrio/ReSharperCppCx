@@ -1,0 +1,103 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClassInheritance.cs b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClassInheritance.cs
+index 2c1648fdea55bf46efbb58311490f319baeb8324..571fbbfbb3caa8e81a7f35c9266c625ad37666ed 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClassInheritance.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClassInheritance.cs
+@@ -209,17 +209,18 @@ public static class CppClassInheritance
+ 
+ 	public static ICppClassResolveEntity GetImplicitBaseResolveEntity(CppImplicitBasesType implicitBaseType, ICppResolveEntitiesCache resolveCache)
+ 	{
++		Language.CppLanguageKind kind = resolveCache.TypeFactory.GetDialect().LanguageKind; // @MOD C++/CX
+ 		switch (implicitBaseType)
+ 		{
+ 		case CppImplicitBasesType.CLI_ENUM:
+-			return resolveCache.GlobalNamespace.GetBuiltinsRefs().cli_system_enum;
++			return resolveCache.GlobalNamespace.GetBuiltinsRefs().GetManagedEnum(kind); // @MOD C++/CX
+ 		case CppImplicitBasesType.CLI_REF_CLASS:
+ 		case CppImplicitBasesType.CLI_INTERFACE_CLASS:
+-			return resolveCache.GlobalNamespace.GetBuiltinsRefs().cli_system_object;
++			return resolveCache.GlobalNamespace.GetBuiltinsRefs().GetManagedObject(kind); // @MOD C++/CX
+ 		case CppImplicitBasesType.CLI_VALUE_CLASS:
+-			return resolveCache.GlobalNamespace.GetBuiltinsRefs().cli_system_valuetype;
++			return resolveCache.GlobalNamespace.GetBuiltinsRefs().GetManagedValueType(kind); // @MOD C++/CX
+ 		case CppImplicitBasesType.CLI_DELEGATE:
+-			return resolveCache.GlobalNamespace.GetBuiltinsRefs().cli_system_multicast_delegate;
++			return resolveCache.GlobalNamespace.GetBuiltinsRefs().GetManagedDelegate(kind); // @MOD C++/CX
+ 		default:
+ 			return null;
+ 		}
+@@ -248,11 +249,12 @@ public static class CppClassInheritance
+ 			return;
+ 		}
+ 		CppGlobalNamespaceResolveEntity.CppBuiltinsRefs builtinsRefs = clazz.GetFileResolveCache().GlobalNamespace.GetBuiltinsRefs();
++		Language.CppLanguageKind kind = clazz.GetFileResolveCache().TypeFactory.GetDialect().LanguageKind; // @MOD C++/CX
+ 		switch (cppImplicitBasesType)
+ 		{
+ 		case CppImplicitBasesType.CLI_ENUM:
+ 		{
+-			ICppClassResolveEntity cli_system_enum = builtinsRefs.cli_system_enum;
++			ICppClassResolveEntity cli_system_enum = builtinsRefs.GetManagedEnum(kind); // @MOD C++/CX
+ 			if (cli_system_enum != null)
+ 			{
+ 				res.Add(new CppBasicBaseDescription<ICppClassResolveEntity>(CppBaseSpecifiers.PUBLIC | CppBaseSpecifiers.IMPLICIT, cli_system_enum));
+@@ -262,7 +264,7 @@ public static class CppClassInheritance
+ 		case CppImplicitBasesType.CLI_DELEGATE:
+ 			if (!HasCliDelegateBase(res))
+ 			{
+-				ICppClassResolveEntity cli_system_multicast_delegate = builtinsRefs.cli_system_multicast_delegate;
++				ICppClassResolveEntity cli_system_multicast_delegate = builtinsRefs.GetManagedDelegate(kind); // @MOD C++/CX
+ 				if (cli_system_multicast_delegate != null)
+ 				{
+ 					res.Add(new CppBasicBaseDescription<ICppClassResolveEntity>(CppBaseSpecifiers.PUBLIC | CppBaseSpecifiers.IMPLICIT, cli_system_multicast_delegate));
+@@ -272,7 +274,7 @@ public static class CppClassInheritance
+ 		case CppImplicitBasesType.CLI_REF_CLASS:
+ 			if (!HasCliClassBase(res))
+ 			{
+-				ICppClassResolveEntity cli_system_object2 = builtinsRefs.cli_system_object;
++				ICppClassResolveEntity cli_system_object2 = builtinsRefs.GetManagedObject(kind); // @MOD C++/CX
+ 				if (cli_system_object2 != null)
+ 				{
+ 					res.Add(new CppBasicBaseDescription<ICppClassResolveEntity>(CppBaseSpecifiers.PUBLIC | CppBaseSpecifiers.IMPLICIT, cli_system_object2));
+@@ -281,7 +283,7 @@ public static class CppClassInheritance
+ 			break;
+ 		case CppImplicitBasesType.CLI_VALUE_CLASS:
+ 		{
+-			ICppClassResolveEntity cli_system_valuetype = builtinsRefs.cli_system_valuetype;
++			ICppClassResolveEntity cli_system_valuetype = builtinsRefs.GetManagedValueType(kind); // @MOD C++/CX
+ 			if (cli_system_valuetype != null && !FindBase(res, cli_system_valuetype))
+ 			{
+ 				res.Add(new CppBasicBaseDescription<ICppClassResolveEntity>(CppBaseSpecifiers.PUBLIC | CppBaseSpecifiers.IMPLICIT, cli_system_valuetype));
+@@ -290,7 +292,7 @@ public static class CppClassInheritance
+ 		}
+ 		case CppImplicitBasesType.CLI_INTERFACE_CLASS:
+ 		{
+-			ICppClassResolveEntity cli_system_object = builtinsRefs.cli_system_object;
++			ICppClassResolveEntity cli_system_object = builtinsRefs.GetManagedObject(kind); // @MOD C++/CX
+ 			if (res.Count == 0 && cli_system_object != null)
+ 			{
+ 				res.Add(new CppBasicBaseDescription<ICppClassResolveEntity>(CppBaseSpecifiers.PUBLIC | CppBaseSpecifiers.VIRTUAL | CppBaseSpecifiers.IMPLICIT, cli_system_object));
+@@ -319,6 +321,25 @@ public static class CppClassInheritance
+ 		{
+ 			return false;
+ 		}
++		// @MOD C++/CX: only public destruction projects IClosable/IDisposable.
++		// A private nonvirtual destructor runs on the final Release; making it
++		// implement IDisposable instead leaves an unimplemented public interface
++		// slot and incorrectly makes an otherwise allocatable ref class abstract.
++		if (cent.GetFileResolveCache().TypeFactory.GetDialect().LanguageKind == Language.CppLanguageKind.CppCx)
++		{
++			ICppFunctionDeclaratorResolveEntityPack destructors = cent.GetDestructors();
++			if (destructors != null)
++			{
++				foreach (var destructor in destructors.GetGroupedFunctions())
++				{
++					if (destructor.GetAccessibility() == CppAccessibility.PUBLIC)
++					{
++						return !cent.HasTrivialDestructor(in vp);
++					}
++				}
++			}
++			return false;
++		}
+ 		return !cent.HasTrivialDestructor(in vp);
+ 	}
+ 

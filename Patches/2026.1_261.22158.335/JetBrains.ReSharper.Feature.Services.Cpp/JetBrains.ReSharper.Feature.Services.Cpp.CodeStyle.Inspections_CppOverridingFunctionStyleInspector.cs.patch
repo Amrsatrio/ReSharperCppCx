@@ -1,0 +1,13 @@
+diff --git a/JetBrains.ReSharper.Feature.Services.Cpp.CodeStyle.Inspections/CppOverridingFunctionStyleInspector.cs b/JetBrains.ReSharper.Feature.Services.Cpp.CodeStyle.Inspections/CppOverridingFunctionStyleInspector.cs
+index e1f7639cba713a59708af3e2d2e8d17f6754337b..bf3d34b1eeee6849277c74efd08929e4566d34f0 100644
+--- a/JetBrains.ReSharper.Feature.Services.Cpp.CodeStyle.Inspections/CppOverridingFunctionStyleInspector.cs
++++ b/JetBrains.ReSharper.Feature.Services.Cpp.CodeStyle.Inspections/CppOverridingFunctionStyleInspector.cs
+@@ -58,7 +58,7 @@ public class CppOverridingFunctionStyleInspector : CodeStyleInspectorBase<CppOve
+ 		}
+ 		CppOverridingFunctionStyle value = boundSettingsStore.GetValue(cached.IsDestructor ? CppCodeStyleSettingsAccessors.OverridingDestructorStyle : CppCodeStyleSettingsAccessors.OverridingFunctionStyle);
+ 		bool flag3 = resolveEntity.DeclarationSpecifiers.IsVirtual() && DeclarationNavigator.GetByDeclarator(declaratorNode)?.DeclarationSpecifiersNode.VirtualSpecifierNode != null;
+-		bool flag4 = value.RequiresVirtual();
++		bool flag4 = value.RequiresVirtual() || CppTreeModificationUtil.IsCxPublicDestructor(declaratorNode);
+ 		bool flag5 = resolveEntity.PureVirtualSpecifiers.IsOverride() && declaratorNode.OverrideSpecifierNode != null;
+ 		bool flag6 = value.RequiresOverride() && (!cached.IsDestructor || !cached.Class.IsCliManagedClass) && ((!resolveEntity.PureVirtualSpecifiers.IsFinalOrSealed() | flag4) || classByMember.IsFinalOrSealed()) && languageDialect.HasOverride;
+ 		bool flag7 = !flag3 & flag4;

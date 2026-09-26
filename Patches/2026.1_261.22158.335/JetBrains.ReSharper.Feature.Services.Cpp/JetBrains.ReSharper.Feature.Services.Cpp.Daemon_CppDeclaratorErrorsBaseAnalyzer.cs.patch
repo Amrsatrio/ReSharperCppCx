@@ -1,0 +1,17 @@
+diff --git a/JetBrains.ReSharper.Feature.Services.Cpp.Daemon/CppDeclaratorErrorsBaseAnalyzer.cs b/JetBrains.ReSharper.Feature.Services.Cpp.Daemon/CppDeclaratorErrorsBaseAnalyzer.cs
+index ff5981ed1bc6589e6c1e26e8ff238c80463194c5..52589a7a5c6aca6a010b9e0586a45e47f9625824 100644
+--- a/JetBrains.ReSharper.Feature.Services.Cpp.Daemon/CppDeclaratorErrorsBaseAnalyzer.cs
++++ b/JetBrains.ReSharper.Feature.Services.Cpp.Daemon/CppDeclaratorErrorsBaseAnalyzer.cs
+@@ -264,6 +264,12 @@ public abstract class CppDeclaratorErrorsBaseAnalyzer : IElementProblemAnalyzer
+ 
+ 	private static bool TryReportInvalidTypeError(IHighlightingConsumer consumer, ITreeNode errorNode, CppQualType errorType)
+ 	{
++		string cxError = CppNonAbstractDeclaratorNodeUtil.GetCxRefTypePointerError(errorNode, errorType);
++		if (cxError != null)
++		{
++			consumer.AddHighlighting(new CppCxRefPointerError(cxError, errorNode));
++			return true;
++		}
+ 		if (!errorType.IsUnknownType())
+ 		{
+ 			return false;

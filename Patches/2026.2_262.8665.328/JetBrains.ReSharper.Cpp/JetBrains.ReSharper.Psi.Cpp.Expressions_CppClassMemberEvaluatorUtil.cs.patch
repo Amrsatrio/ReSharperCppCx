@@ -1,0 +1,39 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Expressions/CppClassMemberEvaluatorUtil.cs b/JetBrains.ReSharper.Psi.Cpp.Expressions/CppClassMemberEvaluatorUtil.cs
+index a628ae0c8f432de0f2db35e679b24b725c09463e..363977428365891831dddcc3a43c432fe5d23f24 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Expressions/CppClassMemberEvaluatorUtil.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Expressions/CppClassMemberEvaluatorUtil.cs
+@@ -9,33 +9,7 @@ namespace JetBrains.ReSharper.Psi.Cpp.Expressions;
+ 
+ public static class CppClassMemberEvaluatorUtil
+ {
+-	[SpecialName]
+-	public sealed class _003CG_003E_0024DECC20F3D968796A066353213AC662D3
+-	{
+-		[SpecialName]
+-		public static class _003CM_003E_0024E1A7650F5B0E8AD71B6A8B686311C1C8
+-		{
+-			[SpecialName]
+-			[CompilerGenerated]
+-			public static void _003CExtension_003E_0024(CppObjectValue objectValue)
+-			{
+-			}
+-		}
+-
+-		[System.Runtime.CompilerServices.ExtensionMarker("<M>$E1A7650F5B0E8AD71B6A8B686311C1C8")]
+-		[MustUseReturnValue]
+-		public CppEvaluationFail EvaluateMember<TEvaluator>(ICppGroupedVariableDeclaratorResolveEntity dataMember, TEvaluator evaluator, CppExpressionEvaluator expressionEvaluator) where TEvaluator : struct, ICppClassMemberEvaluator
+-		{
+-			throw new NotSupportedException();
+-		}
+-
+-		[System.Runtime.CompilerServices.ExtensionMarker("<M>$E1A7650F5B0E8AD71B6A8B686311C1C8")]
+-		[MustUseReturnValue]
+-		public CppEvaluationFail EvaluateBase<TEvaluator>(ICppClassResolveEntity baseClass, TEvaluator evaluator, CppExpressionEvaluator expressionEvaluator) where TEvaluator : struct, ICppClassMemberEvaluator
+-		{
+-			throw new NotSupportedException();
+-		}
+-	}
++	// @MOD Fix compile
+ 
+ 	[MustUseReturnValue]
+ 	public static CppEvaluationFail EvaluateMember<TEvaluator>(this CppObjectValue objectValue, ICppGroupedVariableDeclaratorResolveEntity dataMember, TEvaluator evaluator, CppExpressionEvaluator expressionEvaluator) where TEvaluator : struct, ICppClassMemberEvaluator

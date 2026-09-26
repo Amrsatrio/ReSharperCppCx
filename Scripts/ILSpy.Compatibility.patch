@@ -1,0 +1,283 @@
+diff --git a/ICSharpCode.Decompiler.Tests/TestCases/Pretty/ConstructorInitializers.cs b/ICSharpCode.Decompiler.Tests/TestCases/Pretty/ConstructorInitializers.cs
+index 6d2d4041a..f768f575f 100644
+--- a/ICSharpCode.Decompiler.Tests/TestCases/Pretty/ConstructorInitializers.cs
++++ b/ICSharpCode.Decompiler.Tests/TestCases/Pretty/ConstructorInitializers.cs
+@@ -106,6 +106,18 @@ public Issue1743WithPrimaryCtor(int dummy)
+ 			}
+ 		}
+ 
++		public class ConstructorInitializerDependingOnInstanceField
++		{
++			private readonly int first;
++			private readonly int second;
++
++			public ConstructorInitializerDependingOnInstanceField(int value)
++			{
++				first = value;
++				second = first + 1;
++			}
++		}
++
+ 		/// <summary>
+ 		/// This is info about the class
+ 		/// </summary>
+diff --git a/ICSharpCode.Decompiler.Tests/TestCases/Pretty/ExpressionTrees.cs b/ICSharpCode.Decompiler.Tests/TestCases/Pretty/ExpressionTrees.cs
+index 99acb2186..7f393e6f4 100644
+--- a/ICSharpCode.Decompiler.Tests/TestCases/Pretty/ExpressionTrees.cs
++++ b/ICSharpCode.Decompiler.Tests/TestCases/Pretty/ExpressionTrees.cs
+@@ -836,6 +836,33 @@ public static void Quote()
+ 			Test<Func<bool>>(() => (Expression<Func<int, string, string>>)((int n, string s) => s + n.ToString()) != null, () => (Expression<Func<int, string, string>>)((int n, string s) => s + n.ToString()) != null);
+ 		}
+ 
++		private enum SwitchMode
++		{
++			First,
++			Second
++		}
++
++		private class SwitchSettings
++		{
++			public SwitchMode Mode;
++		}
++
++		private static SwitchMode ReadSetting(Expression<Func<SwitchSettings, SwitchMode>> expression)
++		{
++			return SwitchMode.First;
++		}
++
++		public static int ExpressionTreeInSwitch()
++		{
++			switch (ReadSetting(key => key.Mode))
++			{
++				case SwitchMode.First:
++					return 1;
++				default:
++					return 2;
++			}
++		}
++
+ 		public static void ArrayInitializer()
+ 		{
+ 			Test<Func<int[]>>(() => new int[3] { 1, 2, 3 }, () => new int[3] { 1, 2, 3 });
+diff --git a/ICSharpCode.Decompiler/CSharp/CSharpDecompiler.cs b/ICSharpCode.Decompiler/CSharp/CSharpDecompiler.cs
+index 2e4ce5067..f88a17129 100644
+--- a/ICSharpCode.Decompiler/CSharp/CSharpDecompiler.cs
++++ b/ICSharpCode.Decompiler/CSharp/CSharpDecompiler.cs
+@@ -162,6 +162,8 @@ public static List<IILTransform> GetILTransforms()
+ 						),
+ 					}
+ 				},
++				// Expression-tree reconstruction may replace setup stores after the initial cleanup pass.
++				new RemoveDeadVariableInit(),
+ 				new ProxyCallReplacer(),
+ 				new FixRemainingIncrements(),
+ 				new CopyPropagation(),
+diff --git a/ICSharpCode.Decompiler/CSharp/Transforms/TransformFieldAndConstructorInitializers.cs b/ICSharpCode.Decompiler/CSharp/Transforms/TransformFieldAndConstructorInitializers.cs
+index 63da3e010..e2b608e04 100644
+--- a/ICSharpCode.Decompiler/CSharp/Transforms/TransformFieldAndConstructorInitializers.cs
++++ b/ICSharpCode.Decompiler/CSharp/Transforms/TransformFieldAndConstructorInitializers.cs
+@@ -393,6 +393,13 @@ public bool Analyze(IEnumerable<AstNode> members)
+ 							}
+ 						}
+ 
++						if (initializer.Statements.Any(entry => ReferencesInstanceMember(entry.Initializer)))
++						{
++							// Instance field/property initializers cannot reference the current instance.
++							// Keep the explicit constructor instead of emitting uncompilable initializers.
++							transformToPrimaryConstructor = false;
++						}
++
+ 						if (transformToPrimaryConstructor)
+ 						{
+ 							PrimaryConstructorParameterToBackingStoreMap ??= [];
+@@ -403,6 +410,24 @@ public bool Analyze(IEnumerable<AstNode> members)
+ 					}
+ 				}
+ 
++			static bool ReferencesInstanceMember(Expression initializer)
++			{
++				foreach (var node in initializer.DescendantsAndSelf)
++				{
++					bool isCurrentInstanceReference = node is IdentifierExpression
++						|| node is MemberReferenceExpression {
++							Target: ThisReferenceExpression or BaseReferenceExpression
++						};
++					if (!isCurrentInstanceReference || node.GetSymbol() is not IMember { IsStatic: false } member)
++						continue;
++					if (member is IField field
++						&& IsGeneratedPrimaryConstructorBackingField((IField)field.MemberDefinition))
++						continue;
++					return true;
++				}
++				return false;
++			}
++
+ 				if (StaticConstructor != null)
+ 				{
+ 					StaticInitializers = InitializerSequence.Analyze(this, StaticConstructorDecl!, StaticConstructor);
+diff --git a/ICSharpCode.Decompiler/IL/Transforms/TransformExpressionTrees.cs b/ICSharpCode.Decompiler/IL/Transforms/TransformExpressionTrees.cs
+index c196e0c66..f79c837e0 100644
+--- a/ICSharpCode.Decompiler/IL/Transforms/TransformExpressionTrees.cs
++++ b/ICSharpCode.Decompiler/IL/Transforms/TransformExpressionTrees.cs
+@@ -117,7 +117,10 @@ public void Run(Block block, int pos, StatementTransformContext context)
+ 				if (TryConvertExpressionTree(block.Instructions[i], block.Instructions[i]))
+ 				{
+ 					foreach (var inst in instructionsToRemove)
+-						block.Instructions.Remove(inst);
++					{
++						if (inst is StLoc store)
++							store.Value = new DefaultValue(store.Variable.Type).WithILRange(store.Value);
++					}
+ 					instructionsToRemove.Clear();
+ 				}
+ 				break;
+@@ -140,8 +143,12 @@ bool TryConvertExpressionTree(ILInstruction instruction, ILInstruction statement
+ 				}
+ 				return false;
+ 			}
+-			if (instruction is Block block && block.Kind == BlockKind.ControlFlow)
+-				return false;  // don't look into nested blocks
++			if (instruction is Block { Kind: BlockKind.ControlFlow } controlFlowBlock)
++			{
++				var switchInstruction = controlFlowBlock.Instructions.OfType<SwitchInstruction>().LastOrDefault();
++				return switchInstruction != null
++					&& TryConvertExpressionTree(switchInstruction.Value, statement);
++			}
+ 			foreach (var child in instruction.Children)
+ 			{
+ 				if (TryConvertExpressionTree(child, statement))
+@@ -244,12 +251,21 @@ bool ReadParameters(ILInstruction initializer, IList<IParameter> parameters, ILi
+ 					int i = 0;
+ 					foreach (var inst in initializerBlock.Instructions.OfType<StObj>())
+ 					{
+-						if (i >= this.parameters.Count)
+-							return false;
+ 						if (!inst.Value.MatchLdLoc(out var v))
+ 							return false;
+ 						if (!this.parameters.TryGetValue(v, out var value))
+-							return false;
++						{
++							if (!v.IsSingleDefinition
++								|| v.StoreInstructions.SingleOrDefault() is not ILInstruction store
++								|| !MatchParameterVariableAssignment(store, out var parameterReferenceVar,
++									out var parameterType, out var parameterName)
++								|| parameterReferenceVar != v)
++							{
++								return false;
++							}
++							value = (parameterType, parameterName);
++							this.parameters.Add(v, value);
++						}
+ 						// Add parameter variable only once to mapping.
+ 						if (!this.parameterMapping.ContainsKey(v))
+ 						{
+@@ -427,6 +443,18 @@ ILFunction ApplyChangesToILFunction()
+ 									return (() => new ExpressionTreeCast(t, ldloc, false), t);
+ 							}
+ 						}
++						else if (ldloc.Variable is { IsSingleDefinition: true, LoadInstructions.Count: 1 }
++							&& ldloc.Variable.StoreInstructions.SingleOrDefault() is StLoc store)
++						{
++							var converted = ConvertInstruction(store.Value, typeHint);
++							if (converted.Item1 != null)
++							{
++								context.Step("Inline expression-tree stack slot", store);
++								store.Value = new DefaultValue(store.Variable.Type).WithILRange(store.Value);
++								context.EndStep(store);
++								return converted;
++							}
++						}
+ 						return (null, SpecialType.UnknownType);
+ 					default:
+ 						return (null, SpecialType.UnknownType);
+@@ -1499,11 +1527,11 @@ static bool MatchFromHandleParameterList(CallInstruction call, out IMember membe
+ 			switch (call.Arguments.Count)
+ 			{
+ 				case 1:
+-					if (!call.Arguments[0].MatchLdMemberToken(out member))
++					if (!call.Arguments[0].UnwrapConv(ConversionKind.StopGCTracking).MatchLdMemberToken(out member))
+ 						return false;
+ 					break;
+ 				case 2:
+-					if (!call.Arguments[0].MatchLdMemberToken(out member))
++					if (!call.Arguments[0].UnwrapConv(ConversionKind.StopGCTracking).MatchLdMemberToken(out member))
+ 						return false;
+ 					if (!call.Arguments[1].MatchLdTypeToken(out _))
+ 						return false;
+diff --git a/ICSharpCode.Decompiler/IL/Instructions/Block.cs b/ICSharpCode.Decompiler/IL/Instructions/Block.cs
+index 6c8206c46..8e0d149d0 100644
+--- a/ICSharpCode.Decompiler/IL/Instructions/Block.cs
++++ b/ICSharpCode.Decompiler/IL/Instructions/Block.cs
+@@ -173,7 +173,7 @@ internal override void CheckInvariant(ILPhase phase)
+ 						case Block callWithNamedArgs when callWithNamedArgs.Kind == BlockKind.CallWithNamedArgs:
+ 							type2 = ((CallInstruction)callWithNamedArgs.FinalInstruction).Method.ReturnType;
+ 							break;
+-						case CallInstruction ci2 when TransformCollectionAndObjectInitializers.IsRecordCloneMethodCall(ci2):
++						case CallInstruction ci2 when TransformCollectionAndObjectInitializers.IsCloneMethodCall(ci2):
+ 							type2 = ci2.Method.DeclaringType;
+ 							break;
+ 						case Call c2 when c2.Method.FullNameIs("System.Activator", "CreateInstance") && c2.Method.TypeArguments.Count == 1:
+diff --git a/ICSharpCode.Decompiler/IL/Transforms/TransformCollectionAndObjectInitializers.cs b/ICSharpCode.Decompiler/IL/Transforms/TransformCollectionAndObjectInitializers.cs
+index 4f07d200e..f65deeb43 100644
+--- a/ICSharpCode.Decompiler/IL/Transforms/TransformCollectionAndObjectInitializers.cs
++++ b/ICSharpCode.Decompiler/IL/Transforms/TransformCollectionAndObjectInitializers.cs
+@@ -45,6 +45,7 @@ void IStatementTransform.Run(Block block, int pos, StatementTransformContext con
+ 			IType instType;
+ 			var blockKind = BlockKind.CollectionInitializer;
+ 			var insertionPos = initInst.ChildIndex;
++			CallInstruction? cloneCall = null;
+ 			var siblings = initInst.Parent!.Children;
+ 			IMethod currentMethod = context.Function.Method!;
+ 			// we allow a castclass instruction to wrap the init instruction:
+@@ -93,9 +94,10 @@ void IStatementTransform.Run(Block block, int pos, StatementTransformContext con
+ 					instType = c.Method.TypeArguments[0];
+ 					blockKind = BlockKind.ObjectInitializer;
+ 					break;
+-				case CallInstruction ci when context.Settings.WithExpressions && IsRecordCloneMethodCall(ci):
++				case CallInstruction ci when context.Settings.WithExpressions && IsCloneMethodCall(ci):
+ 					instType = ci.Method.DeclaringType;
+ 					blockKind = BlockKind.WithInitializer;
++					cloneCall = ci;
+ 					initInst = ci.Arguments.Single();
+ 					break;
+ 				default:
+@@ -146,9 +148,17 @@ void IStatementTransform.Run(Block block, int pos, StatementTransformContext con
+ 			{
+ 				initializerItemsCount = index.Value - pos - 1;
+ 			}
+-			// The initializer would be empty, there's nothing to do here.
+ 			if (initializerItemsCount <= 0)
++			{
++				if (cloneCall != null)
++				{
++					context.Step("Remove empty clone", cloneCall);
++					cloneCall.ReplaceWith(initInst);
++					context.EndStep(initInst);
++					ILInlining.InlineIfPossible(block, pos, context);
++				}
+ 				return;
++			}
+ 			context.Step("CollectionOrObjectInitializer", inst);
+ 			// Create a new block and final slot (initializer target variable)
+ 			var initializerBlock = new Block(blockKind);
+@@ -201,10 +211,8 @@ private static bool TypeContainsInitOnlyProperties(ITypeDefinition? typeDefiniti
+ 			return false;
+ 		}
+ 
+-		internal static bool IsRecordCloneMethodCall(CallInstruction ci)
++		internal static bool IsCloneMethodCall(CallInstruction ci)
+ 		{
+-			if (ci.Method.DeclaringTypeDefinition?.IsRecord != true)
+-				return false;
+ 			if (ci.Method.Name != "<Clone>$")
+ 				return false;
+ 			if (ci.Arguments.Count != 1)
+@@ -246,6 +254,8 @@ bool IsPartOfInitializer(InstructionCollection<ILInstruction> instructions, int
+ 			(var kind, var newPath, var values, var targetVariable, var usedIndices) = AccessPathElement.GetAccessPath(instructions[pos], rootType, context.Settings, context.CSharpResolver);
+ 			if (kind == AccessPathKind.Invalid || target != targetVariable)
+ 				return false;
++			if (blockKind == BlockKind.WithInitializer && newPath.Count > 1)
++				return false;
+ 			// Treat last element separately:
+ 			// Can either be an Add method call or property setter.
+ 			var lastElement = newPath.Last();

@@ -1,0 +1,176 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Caches/CppCxPlatformReferenceProvider.cs b/JetBrains.ReSharper.Psi.Cpp.Caches/CppCxPlatformReferenceProvider.cs
+new file mode 100644
+index 0000000000000000000000000000000000000000..a86c72fa47d9bbca6d2926e77889964176bc5490
+--- /dev/null
++++ b/JetBrains.ReSharper.Psi.Cpp.Caches/CppCxPlatformReferenceProvider.cs
+@@ -0,0 +1,170 @@
++// @MOD C++/CX
++
++using System;
++using System.Collections.Generic;
++using JetBrains.Application.Parts;
++using JetBrains.Application.Threading;
++using JetBrains.Application.changes;
++using JetBrains.Lifetimes;
++using JetBrains.Metadata.Reader.API;
++using JetBrains.ProjectModel;
++using JetBrains.ProjectModel.Model2.Assemblies.Interfaces;
++using JetBrains.ProjectModel.model2.Assemblies.Interfaces;
++using JetBrains.ProjectModel.Properties.VCXProj;
++using JetBrains.ReSharper.Psi.Cpp.Util;
++using JetBrains.ReSharper.Psi.Modules;
++using JetBrains.Util;
++
++namespace JetBrains.ReSharper.Psi.Cpp.Caches;
++
++[SolutionComponent(Instantiation.DemandAnyThreadSafe)]
++public sealed class CppCxPlatformReferenceProvider : IProjectPsiModuleProviderFilter
++{
++	private readonly IAssemblyFactory myAssemblyFactory;
++	private readonly ChangeManager myChangeManager;
++	private readonly IShellLocks myLocks;
++
++	public CppCxPlatformReferenceProvider(IAssemblyFactory assemblyFactory, ChangeManager changeManager, IShellLocks locks)
++	{
++		myAssemblyFactory = assemblyFactory;
++		myChangeManager = changeManager;
++		myLocks = locks;
++	}
++
++	public Tuple<IProjectPsiModuleHandler, IPsiModuleDecorator> OverrideHandler(Lifetime lifetime, IProject project, IProjectPsiModuleHandler handler)
++	{
++		if (project.ProjectProperties is not VCXProjectProperties || handler.PrimaryModule == null)
++			return null;
++		var decorator = new Handler(lifetime, project, handler, myAssemblyFactory, myChangeManager, myLocks);
++		return Tuple.Create<IProjectPsiModuleHandler, IPsiModuleDecorator>(decorator, decorator);
++	}
++
++	internal static VirtualFileSystemPath FindPlatformWinmd(VCXProjectConfiguration configuration, VirtualFileSystemPath projectLocation)
++	{
++		if (configuration == null)
++			return null;
++		bool useDefault = configuration.Properties.ConsumeWindowsRuntimeExtensionsWINRT;
++		if (configuration.ClCommandLines is { Length: > 0 } commandLines)
++		{
++			useDefault = false;
++			foreach (ClCommandLine commandLine in commandLines)
++			{
++				string[] args = commandLine.CommandLineArgs;
++				bool cx = false;
++				bool noStdLib = false;
++				foreach (string arg in args)
++				{
++					if (arg == "/ZW" || arg == "-ZW")
++						cx = true;
++					else if (arg == "/ZW:nostdlib" || arg == "-ZW:nostdlib")
++						cx = noStdLib = true;
++				}
++				if (!cx)
++					continue;
++				useDefault |= !noStdLib;
++				for (int i = 0; i < args.Length; i++)
++				{
++					string arg = args[i];
++					if (!arg.StartsWith("/FU", StringComparison.Ordinal) && !arg.StartsWith("-FU", StringComparison.Ordinal))
++						continue;
++					string value = arg.Length > 3 ? arg.Substring(3) : ++i < args.Length ? args[i] : null;
++					if (string.IsNullOrEmpty(value))
++						continue;
++					VirtualFileSystemPath path = VirtualFileSystemPath.TryParse(value.Trim('"'), InteractionContext.SolutionContext, FileSystemPathInternStrategy.DO_NOT_INTERN);
++					if (path.IsNullOrEmpty() || !string.Equals(path.Name, "platform.winmd", StringComparison.OrdinalIgnoreCase))
++						continue;
++					if (!path.IsAbsolute)
++						path = path.ToAbsolutePath(projectLocation);
++					// An explicit compiler import takes precedence, including when it is missing.
++					return path.ExistsFile ? path : null;
++				}
++			}
++		}
++		if (!useDefault)
++			return null;
++		// The selected VC include directory identifies the toolset, without probing other VS installations.
++		foreach (VirtualFileSystemPath include in configuration.GetIncludeAbsolutePaths(projectLocation))
++		{
++			if (!include.Combine("vccorlib.h").ExistsFile)
++				continue;
++			VirtualFileSystemPath path = include.Parent.Combine("lib/x86/store/references/platform.winmd");
++			if (path.ExistsFile)
++				return path;
++		}
++		return null;
++	}
++
++	private sealed class Handler : DelegatingProjectPsiModuleHandler, IPsiModuleDecorator
++	{
++		private readonly IProject myProject;
++		private readonly IAssemblyFactory myAssemblyFactory;
++		private IAssemblyCookie myCookie;
++		private VirtualFileSystemPath myPath;
++		private IModuleReferenceResolveContext myResolveContext;
++
++		public Handler(Lifetime lifetime, IProject project, IProjectPsiModuleHandler handler, IAssemblyFactory assemblyFactory, ChangeManager changeManager, IShellLocks locks)
++			: base(handler)
++		{
++			myProject = project;
++			myAssemblyFactory = assemblyFactory;
++			SyncAssembly();
++			lifetime.OnTermination(() => changeManager.ExecuteAfterChange(() => locks.ExecuteWithWriteLock(ReleaseAssembly)));
++		}
++
++		private void ReleaseAssembly()
++		{
++			IAssemblyCookie cookie = myCookie;
++			myCookie = null;
++			cookie?.Dispose();
++		}
++
++		private bool SyncAssembly()
++		{
++			VirtualFileSystemPath path = FindPlatformWinmd(CppProjectConfigurationUtil.GetProjectConfiguration(myProject), myProject.Location);
++			IModuleReferenceResolveContext context = myProject.GetResolveContext(PrimaryModule.TargetFrameworkId);
++			if (path == myPath && Equals(context, myResolveContext))
++				return false;
++			ReleaseAssembly();
++			myPath = path;
++			myResolveContext = context;
++			if (!path.IsNullOrEmpty())
++				myCookie = myAssemblyFactory.AddRef(path.ToAssemblyLocation(), nameof(CppCxPlatformReferenceProvider) + ": " + myProject.Name, context);
++			return true;
++		}
++
++		public override void OnProjectPropertiesChanged(PsiModuleChangeBuilder changeBuilder)
++		{
++			base.OnProjectPropertiesChanged(changeBuilder);
++			if (SyncAssembly())
++				changeBuilder.AddModuleChange(PrimaryModule, PsiModuleChange.ChangeType.Modified);
++		}
++
++		public IEnumerable<IPsiModuleReference> OverrideModuleReferences(IEnumerable<IPsiModuleReference> references)
++		{
++			IAssembly assembly = myCookie?.Assembly;
++			IPsiModule platform = assembly == null ? null : myProject.GetSolution().PsiModules().GetPrimaryPsiModule(assembly, PrimaryModule.TargetFrameworkId);
++			if (platform == null)
++				return references;
++			return AppendPlatform(references, platform);
++		}
++
++		private static IEnumerable<IPsiModuleReference> AppendPlatform(IEnumerable<IPsiModuleReference> references, IPsiModule platform)
++		{
++			bool alreadyReferenced = false;
++			foreach (IPsiModuleReference reference in references)
++			{
++				if (reference.Module == platform || reference.Module is IAssemblyPsiModule assemblyModule &&
++				    string.Equals(assemblyModule.Assembly.Location?.AssemblyPhysicalPath?.Name, "platform.winmd", StringComparison.OrdinalIgnoreCase))
++					alreadyReferenced = true;
++				yield return reference;
++			}
++			if (!alreadyReferenced)
++				yield return new PsiModuleReference(platform);
++		}
++
++		public IEnumerable<IPsiSourceFile> OverrideSourceFiles(IEnumerable<IPsiSourceFile> files)
++		{
++			return files;
++		}
++	}
++}

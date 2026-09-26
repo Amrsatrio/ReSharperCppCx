@@ -1,0 +1,25 @@
+diff --git a/JetBrains.ReSharper.Feature.Services.Cpp.Search/CppSearchDeclarationsRequest.cs b/JetBrains.ReSharper.Feature.Services.Cpp.Search/CppSearchDeclarationsRequest.cs
+index 7aad438937ed246092d21de1baa9b577c9e2629a..639a5c91512390a4ad78939cdc179743b0f631d0 100644
+--- a/JetBrains.ReSharper.Feature.Services.Cpp.Search/CppSearchDeclarationsRequest.cs
++++ b/JetBrains.ReSharper.Feature.Services.Cpp.Search/CppSearchDeclarationsRequest.cs
+@@ -66,10 +66,19 @@ public class CppSearchDeclarationsRequest : SearchDeclarationsRequest
+ 		IPsiServices psiServices = Solution.GetPsiServices();
+ 		if (validDeclaredElement.IsClrElement())
+ 		{
+-			return new List<IOccurrence>(1)
++			List<IOccurrence> occurrences = new List<IOccurrence>(1)
+ 			{
+ 				new DeclaredElementOccurrence(validDeclaredElement)
+ 			};
++			foreach (ICppSymbol symbol in CppResolveEntityDeclaredElement.GetCppCxHeaderDefinitions((IClrDeclaredElement)validDeclaredElement))
++			{
++				IOccurrence occurrence = CppOccurrenceUtil.CreateDeclarationOrDefinitionOccurrence(psiServices, symbol, myCurrentProject);
++				if (occurrence != null)
++				{
++					occurrences.Add(occurrence);
++				}
++			}
++			return occurrences;
+ 		}
+ 		if (validDeclaredElement is IPathDeclaredElement element)
+ 		{

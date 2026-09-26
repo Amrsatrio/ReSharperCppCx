@@ -1,0 +1,29 @@
+diff --git a/JetBrains.ReSharper.Feature.Services.Cpp.QuickFixes.Immutability/CppImmutabilityFixesUtil.cs b/JetBrains.ReSharper.Feature.Services.Cpp.QuickFixes.Immutability/CppImmutabilityFixesUtil.cs
+index a7808d861a4f9bf545509f6577d954d6b2c37317..67f8d09d0eee02f70206145961a1731e60936d7c 100644
+--- a/JetBrains.ReSharper.Feature.Services.Cpp.QuickFixes.Immutability/CppImmutabilityFixesUtil.cs
++++ b/JetBrains.ReSharper.Feature.Services.Cpp.QuickFixes.Immutability/CppImmutabilityFixesUtil.cs
+@@ -22,6 +22,11 @@ public static class CppImmutabilityFixesUtil
+ 
+ 	public static bool CanAddConst(ICppNonAbstractDeclaratorNode declarator)
+ 	{
++		ITreeNode cxHandleAnchor = CppTreeModificationUtil.GetCxHandleConstAnchor(declarator);
++		if (cxHandleAnchor != null)
++		{
++			return CppTreeModificationUtil.CanAddCxHandleConst(cxHandleAnchor);
++		}
+ 		Declaration byDeclarator = DeclarationNavigator.GetByDeclarator(declarator);
+ 		if (byDeclarator == null || !byDeclarator.IsInsideModifiableFile())
+ 		{
+@@ -41,6 +46,12 @@ public static class CppImmutabilityFixesUtil
+ 
+ 	public static void AddConst(ICppNonAbstractDeclaratorNode declarator)
+ 	{
++		ITreeNode cxHandleAnchor = CppTreeModificationUtil.GetCxHandleConstAnchor(declarator);
++		if (cxHandleAnchor != null)
++		{
++			CppTreeModificationUtil.AddCxHandleConst(cxHandleAnchor);
++			return;
++		}
+ 		Declaration byDeclarator = DeclarationNavigator.GetByDeclarator(declarator);
+ 		DeclarationSpecifiers declarationSpecifiersNode = byDeclarator.DeclarationSpecifiersNode;
+ 		using (WriteLockCookie.Create("Src\\QuickFixes\\Immutability\\CppImmutabilityFixesUtil.cs", "AddConst"))

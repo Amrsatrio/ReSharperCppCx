@@ -1,0 +1,92 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClrNamespaceResolveEntity.cs b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClrNamespaceResolveEntity.cs
+index 3b21956238e86a3eebd55e93e3acfb312e2d7cb3..0b4b60565b9b17e38c0d473250e20a417ff15699 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClrNamespaceResolveEntity.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClrNamespaceResolveEntity.cs
+@@ -86,6 +86,15 @@ public class CppClrNamespaceResolveEntity : CppNamespaceResolveEntity, ICppClrSc
+ 		return false;
+ 	}
+ 
++	public bool IsPlatformNamespace() // @MOD C++/CX
++	{
++		if (StructuralParent is CppGlobalNamespaceResolveEntity)
++		{
++			return ClrPart.ShortName == "Platform";
++		}
++		return false;
++	}
++
+ 	public static bool IsInternalTypeMember(IClrDeclaredElement declaredElement)
+ 	{
+ 		if (declaredElement is ITypeMember { AccessibilityDomain: var accessibilityDomain })
+@@ -95,6 +104,35 @@ public class CppClrNamespaceResolveEntity : CppNamespaceResolveEntity, ICppClrSc
+ 		return false;
+ 	}
+ 
++
++	private static bool IsFromPlatformWinmd(IClrDeclaredElement element) // @MOD C++/CX
++	{
++		if (element is not ITypeElement typeElement)
++			return false;
++		if (typeElement.Module is not Psi.Modules.IAssemblyPsiModule assemblyModule)
++			return false;
++		JetBrains.Util.VirtualFileSystemPath path = assemblyModule.Assembly.Location?.AssemblyPhysicalPath;
++		return !JetBrains.Util.FileSystemPathEx.IsNullOrEmpty(path) && string.Equals(path.Name, "platform.winmd", System.StringComparison.OrdinalIgnoreCase);
++	}
++
++	// @MOD C++/CX: WinRT ABI interfaces are usable by native consumers even when
++	// their metadata visibility is internal. Keep the existing PSI declaration.
++	private static bool IsExclusiveWinrtInterface(IClrDeclaredElement element)
++	{
++		if (element is not IInterface || element is not Impl.Reflection2.CompiledTypeElement { PsiAssemblyFile: Impl.Reflection2.WinMD.WinMDPsiFile })
++		{
++			return false;
++		}
++		foreach (IAttributeInstance attribute in ((IInterface)element).GetAttributeInstances(AttributesSource.Self))
++		{
++			if (attribute.GetClrName().FullName == "Windows.Foundation.Metadata.ExclusiveToAttribute")
++			{
++				return true;
++			}
++		}
++		return false;
++	}
++
+ 	private void EnsureClrElementsCreated(CppQualifiedNamePart name)
+ 	{
+ 		if (ClrPart == null)
+@@ -123,12 +161,34 @@ public class CppClrNamespaceResolveEntity : CppNamespaceResolveEntity, ICppClrSc
+ 			}
+ 			bool flag = false;
+ 			ICollection<IClrDeclaredElement> nestedElements = ClrPart.GetNestedElements(clrGlobalSymbolsScope, valueOrDefault.Name, caseSensitive: true);
++			// @MOD C++/CX
++			HashSet<Metadata.Reader.API.IClrTypeName> cxPlatformOverrides = null;
++			if (fileResolveCache.TypeFactory.GetDialect().LanguageKind == Language.CppLanguageKind.CppCx)
++			{
++				ITypeElement[] types = nestedElements.OfType<ITypeElement>().ToArray();
++				cxPlatformOverrides = new HashSet<Metadata.Reader.API.IClrTypeName>();
++				foreach (ITypeElement platformType in types)
++				{
++					if (!IsFromPlatformWinmd(platformType))
++						continue;
++					Metadata.Reader.API.IClrTypeName clrName = platformType.GetClrName();
++					if (types.Any(other => !ReferenceEquals(other, platformType) && !IsFromPlatformWinmd(other) && other.GetClrName().Equals(clrName)))
++					{
++						cxPlatformOverrides.Add(clrName);
++					}
++				}
++			}
+ 			bool nativeCppClassWasCreated = false;
+ 			bool nativeCppEnumWasCreated = false;
++			bool isCx = fileResolveCache.GetDialect().LanguageKind == Language.CppLanguageKind.CppCx; // @MOD C++/CX
+ 			foreach (IClrDeclaredElement item in nestedElements)
+ 			{
+-				if (!IsInternalTypeMember(item))
++				if (!IsInternalTypeMember(item) || (isCx && (IsFromPlatformWinmd(item) || IsExclusiveWinrtInterface(item)))) // @MOD C++/CX
+ 				{
++					if (item is ITypeElement typeElement && cxPlatformOverrides != null && cxPlatformOverrides.Contains(typeElement.GetClrName()) && !IsFromPlatformWinmd(typeElement)) // @MOD C++/CX
++					{
++						continue;
++					}
+ 					ICppResolveEntity cppResolveEntity = null;
+ 					if (item is INamespace clrPart)
+ 					{

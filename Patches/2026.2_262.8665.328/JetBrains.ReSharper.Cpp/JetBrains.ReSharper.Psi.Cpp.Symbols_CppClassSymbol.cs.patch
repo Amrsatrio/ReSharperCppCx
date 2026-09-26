@@ -1,0 +1,28 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClassSymbol.cs b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClassSymbol.cs
+index e8435d088370de5df7784d65798b7783992eda77..55eae453e66efd102abb5bd08d0f44c8bee1bdb2 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClassSymbol.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClassSymbol.cs
+@@ -13,7 +13,8 @@ public sealed class CppClassSymbol : CppClassSymbolBaseImpl, ICppClassWithBasesS
+ 		EXPORT = 1,
+ 		IS_ANONYMOUS_CLASS = 2,
+ 		IS_EXPLICIT_INSTANTIATION = 4,
+-		MODULE_ATTACHMENT = 8
++		MODULE_ATTACHMENT = 8,
++		IS_CX_PARTIAL = 16 // @MOD C++/CX: persisted in the existing packed flags byte.
+ 	}
+ 
+ 	private readonly CppClassVirtualSpecifiers myClassVirtualSpecifiers;
+@@ -26,6 +27,13 @@ public sealed class CppClassSymbol : CppClassSymbolBaseImpl, ICppClassWithBasesS
+ 
+ 	public bool IsExplicitInstantiation => (myFlags & Flags.IS_EXPLICIT_INSTANTIATION) == Flags.IS_EXPLICIT_INSTANTIATION;
+ 
++	// @MOD C++/CX
++	public bool IsCxPartial
++	{
++		get => (myFlags & Flags.IS_CX_PARTIAL) != 0;
++		internal set => myFlags = value ? myFlags | Flags.IS_CX_PARTIAL : myFlags & ~Flags.IS_CX_PARTIAL;
++	}
++
+ 	public override CppClassVirtualSpecifiers ClassVirtualSpecifiers => myClassVirtualSpecifiers;
+ 
+ 	public CppClassSymbol(CppQualifiedName name, CppSymbolTemplateParametersList paramList, CppAttributeList attributes, CppSymbolLocation loc, CppClassKey key, CppAccessibility accessibility, CppClassVirtualSpecifiers classVirtualSpecifiers, bool isExplicitInstantiation, bool export, CppModuleAttachment moduleAttachment)

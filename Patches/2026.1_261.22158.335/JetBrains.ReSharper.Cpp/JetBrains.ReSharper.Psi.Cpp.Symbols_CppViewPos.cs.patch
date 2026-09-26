@@ -1,0 +1,18 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppViewPos.cs b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppViewPos.cs
+index 386036c9cf8b5c52b2420c3ea5f2057a763af967..c8f8d8dcbb7c5cfab2f87386c4b36b4ff8b8ae78 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppViewPos.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppViewPos.cs
+@@ -122,6 +122,13 @@ public readonly struct CppViewPos
+ 			}
+ 			else if (cppScopeResolveEntity is ICppClassResolveEntity clazz)
+ 			{
++				// @MOD C++/CX: partial members keep their source anchors, but their
++				// enclosing-scope lookup takes place at the final definition.
++				if (clazz is CppClassOrEnumData data && data.HasDefinition() && data.HasCxPartialDeclarations() &&
++					anchor.CompareTo(data.GetDefinitionLocationAnchor()) < 0)
++				{
++					anchor = data.GetDefinitionLocationAnchor().Next;
++				}
+ 				if (flag)
+ 				{
+ 					anchor = anchor.EnsureAfter(clazz);

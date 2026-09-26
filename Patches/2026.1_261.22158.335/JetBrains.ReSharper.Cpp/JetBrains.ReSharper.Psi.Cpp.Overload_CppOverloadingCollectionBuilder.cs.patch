@@ -1,0 +1,31 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Overload/CppOverloadingCollectionBuilder.cs b/JetBrains.ReSharper.Psi.Cpp.Overload/CppOverloadingCollectionBuilder.cs
+index 4c7a870f45619042640b3407a0771a5885d5222d..1d8af69274510178d114e6f5d1556b5e727dad42 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Overload/CppOverloadingCollectionBuilder.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Overload/CppOverloadingCollectionBuilder.cs
+@@ -163,7 +163,7 @@ public struct CppOverloadingCollectionBuilder(CppTypeContext tc, ICppTemplateArg
+ 			{
+ 				cppBuiltinCandidateTypeSet.myHasGcLValueType = true;
+ 			}
+-			if (factory.GetDialect().LanguageKind == CppLanguageKind.CppCli && CppExpressionsUtil.IsStringLiteralExpr(expr))
++			if (factory.GetDialect().LanguageKind is CppLanguageKind.CppCli or CppLanguageKind.CppCx /*@MOD C++/CX*/ && CppExpressionsUtil.IsStringLiteralExpr(expr))
+ 			{
+ 				CppCliHandleType cliStringHandleType = factory.GetCliStringHandleType();
+ 				if (cliStringHandleType != null)
+@@ -602,7 +602,7 @@ public struct CppOverloadingCollectionBuilder(CppTypeContext tc, ICppTemplateArg
+ 				if (flag & flag2)
+ 				{
+ 					ICppResolvedTypeFactory factory = myCandidateBuilder.TypeContext.Factory;
+-					ICppClassResolveEntity cli_system_object = factory.ResolveCache.GlobalNamespace.GetBuiltinsRefs().cli_system_object;
++					ICppClassResolveEntity cli_system_object = factory.ResolveCache.GlobalNamespace.GetBuiltinsRefs().GetManagedObject(factory.GetDialect().LanguageKind); // @MOD C++/CX
+ 					if (cli_system_object == null)
+ 					{
+ 						throw new Exception("one of the args has cli-handle in type, but GlobalNamespace.BuiltinsRefs.cli_system_object is null");
+@@ -1279,7 +1279,7 @@ public struct CppOverloadingCollectionBuilder(CppTypeContext tc, ICppTemplateArg
+ 				{
+ 					isInsideDirectInit = (forceAllowExplicitConversions = true);
+ 				}
+-				else if (!forceAllowExplicitConversions)
++				else if (!forceAllowExplicitConversions && !(GetTypeFactory().GetDialect().LanguageKind == CppLanguageKind.CppCx && resolvedClassTypeEntity.GetKey().IsCliValueClass())) // @MOD C++/CX
+ 				{
+ 					goto IL_0328;
+ 				}

@@ -1,0 +1,25 @@
+diff --git a/JetBrains.ReSharper.Feature.Services.Cpp.Daemon/CppExpressionErrorsAnalyzer.cs b/JetBrains.ReSharper.Feature.Services.Cpp.Daemon/CppExpressionErrorsAnalyzer.cs
+index 22b3e8ea65bf3861ce2d82d5bb3a9e44d0f2c932..17849310c2f7a9bc4d6409f83922c7f7cd04c688 100644
+--- a/JetBrains.ReSharper.Feature.Services.Cpp.Daemon/CppExpressionErrorsAnalyzer.cs
++++ b/JetBrains.ReSharper.Feature.Services.Cpp.Daemon/CppExpressionErrorsAnalyzer.cs
+@@ -1051,7 +1051,8 @@ public class CppExpressionErrorsAnalyzer : IElementProblemAnalyzer
+ 		CppViewPos viewPos = CppViewPosHelper.GetViewPos(cast);
+ 		ICppResolvedTypeFactory verboseTypeFactory = viewPos.ResolveScope().GetVerboseTypeFactory();
+ 		CppQualType cppQualType = castTypeId.CalculateTypeWithTypeFactory(verboseTypeFactory);
+-		if (CppClassesErrorsAnalyzerUtil.TryHighlightAbstractClassType(consumer, castTypeId, in viewPos, cppQualType, isTypedef: false, isConstructor: false))
++		if (!CppTreeModificationUtil.IsCxCheckedCastMissingHandle(cast) &&
++			CppClassesErrorsAnalyzerUtil.TryHighlightAbstractClassType(consumer, castTypeId, in viewPos, cppQualType, isTypedef: false, isConstructor: false))
+ 		{
+ 			return;
+ 		}
+@@ -1083,7 +1084,9 @@ public class CppExpressionErrorsAnalyzer : IElementProblemAnalyzer
+ 			return;
+ 		}
+ 		ICppExpressionNode castSourceExpr = conv.SourceExpression as ICppExpressionNode;
+-		string failedCastReason = CppPointerCastHelper.GetFailedCastReason(conv);
++		string failedCastReason = CppTreeModificationUtil.IsCxCheckedCastMissingHandle(cast)
++			? "A C++/CX checked-cast target must include the handle declarator '^' (C2682)"
++			: CppPointerCastHelper.GetFailedCastReason(conv);
+ 		object obj = GetErrorNode(conv, cast);
+ 		if (obj == null)
+ 		{

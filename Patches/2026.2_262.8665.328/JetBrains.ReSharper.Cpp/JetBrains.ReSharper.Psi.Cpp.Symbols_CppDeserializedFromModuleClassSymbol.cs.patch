@@ -1,0 +1,13 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppDeserializedFromModuleClassSymbol.cs b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppDeserializedFromModuleClassSymbol.cs
+index 712dae73d00b98ef8a314416e336b7761830d2db..a176d9d75b945e67e0d0e8db206bdb97babfa665 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppDeserializedFromModuleClassSymbol.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppDeserializedFromModuleClassSymbol.cs
+@@ -30,6 +30,8 @@ public class CppDeserializedFromModuleClassSymbol : CppSymbol, ICppClassSymbol,
+ 
+ 	public bool IsDefinition => (myFlags & 4) != 0;
+ 
++	public bool IsCxPartial => IsDefinition && (myFlags & CppSerializedClassSymbol.CxPartialFlag) != 0; // @MOD C++/CX
++
+ 	public CppDeserializedFromModuleClassSymbol(CppSymbolLocation loc, CppQualifiedNamePart name, CppClassVirtualSpecifiers classVirtualSpecifiers, CppClassKey key, byte flags)
+ 		: base(loc.ComplexOffset)
+ 	{

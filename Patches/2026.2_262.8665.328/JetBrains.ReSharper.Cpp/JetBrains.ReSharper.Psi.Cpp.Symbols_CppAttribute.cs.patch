@@ -1,0 +1,14 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppAttribute.cs b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppAttribute.cs
+index a9cff03ede9a661478f82f033db244f21c2fea31..b96e07c7f0d8924e404032c11d11252028492698 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppAttribute.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppAttribute.cs
+@@ -84,6 +84,9 @@ public class CppAttribute : ICppAttribute
+ 
+ 	public static readonly CppAttributeName AssumeName = new CppAttributeName(null, "assume");
+ 
++	// @MOD C++/CX
++	public static readonly CppAttributeName CxMarshalingBehaviorName = new CppAttributeName("Windows::Foundation::Metadata", "MarshalingBehavior");
++
+ 	public const string GnuVectorSizeUnqualifiedName = "vector_size";
+ 
+ 	public static readonly CppAttributeName GnuVectorSizeName = new CppAttributeName("gnu", "vector_size");

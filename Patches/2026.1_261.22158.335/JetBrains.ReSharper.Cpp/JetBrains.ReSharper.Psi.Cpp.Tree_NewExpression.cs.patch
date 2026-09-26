@@ -1,0 +1,31 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Tree/NewExpression.cs b/JetBrains.ReSharper.Psi.Cpp.Tree/NewExpression.cs
+index ea2262173ad38fbcb98c1b2fc88f74cc3275ed85..f2c7c375052b238ed580a7bce75eef9daa9d72fd 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Tree/NewExpression.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Tree/NewExpression.cs
+@@ -148,12 +148,24 @@ public sealed class NewExpression : CppExpressionNodeWithCachedDepInfo, ICppReso
+ 
+ 	public bool IsCliGCNew()
+ 	{
+-		ITokenNode newKeyword = NewKeyword;
++		/*ITokenNode newKeyword = NewKeyword;
+ 		if (newKeyword != null)
+ 		{
+ 			return newKeyword.GetTokenType() == CppTokenNodeTypes.CXXCLI_GCNEW_KEYWORD;
+ 		}
+-		return false;
++		return false;*/
++		// @MOD C++/CX
++
++		// C++/CLI: gcnew T(...)
++		if (FindChildByType<ITokenNode>(CppTokenNodeTypes.CXXCLI_GCNEW_KEYWORD, 0) != null)
++		{
++			return true;
++		}
++
++		// C++/CX: ref new T(...)
++		ITokenNode refKeyword = FindChildByType<ITokenNode>(CppTokenNodeTypes.CXXCLI_REF_KEYWORD, 0);
++		ITokenNode newKeyword = FindChildByType<ITokenNode>(CppTokenNodeTypes.NEW_KEYWORD, 0);
++		return refKeyword != null && newKeyword != null;
+ 	}
+ 
+ 	public bool IsFromGlobalNamespace()

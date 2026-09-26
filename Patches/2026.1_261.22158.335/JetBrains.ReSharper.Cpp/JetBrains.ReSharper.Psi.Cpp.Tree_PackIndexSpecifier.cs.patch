@@ -1,0 +1,26 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Tree/PackIndexSpecifier.cs b/JetBrains.ReSharper.Psi.Cpp.Tree/PackIndexSpecifier.cs
+index c34009655914d8c838151c98ca9fd6a46a3a7ece..9b760a6364ccdd5b710912a245dcb4c821f2dc8f 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Tree/PackIndexSpecifier.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Tree/PackIndexSpecifier.cs
+@@ -81,17 +81,10 @@ public class PackIndexSpecifier : CppCompositeNode
+ 
+ 	private string GetPackName()
+ 	{
+-		ITreeNode packRef = PackRef;
+-		if (!(packRef is ITokenNode node))
++		return PackRef switch // @MOD Fix compile
+ 		{
+-			if (packRef is MSIdentifier mSIdentifier)
+-			{
+-				return mSIdentifier.GetUnscreenedText();
+-			}
+-			global::_003CPrivateImplementationDetails_003E.ThrowInvalidOperationException();
+-			string result = default(string);
+-			return result;
+-		}
+-		return node.GetTokenNodeText();
++			ITokenNode node => node.GetTokenNodeText(),
++			MSIdentifier mSIdentifier => mSIdentifier.GetUnscreenedText()
++		};
+ 	}
+ }

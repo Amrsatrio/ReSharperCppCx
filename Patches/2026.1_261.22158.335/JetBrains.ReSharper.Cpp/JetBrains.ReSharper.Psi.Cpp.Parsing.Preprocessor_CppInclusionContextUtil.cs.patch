@@ -1,0 +1,24 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Parsing.Preprocessor/CppInclusionContextUtil.cs b/JetBrains.ReSharper.Psi.Cpp.Parsing.Preprocessor/CppInclusionContextUtil.cs
+index 6fc2f604c5bb631f7c800bfd003943e2c260b524..9a84781ed2a5d4cb7d0cdb852dbbd6e2e4e401b5 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Parsing.Preprocessor/CppInclusionContextUtil.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Parsing.Preprocessor/CppInclusionContextUtil.cs
+@@ -100,7 +100,9 @@ public static class CppInclusionContextUtil
+ 		if (props.LanguageKind.HasValue)
+ 		{
+ 			CppLanguageKind value = props.LanguageKind.Value;
+-			if (value == CppLanguageKind.CppCx || (value == CppLanguageKind.CppCli && !globalCache.GlobalCache.EnableCppCliSupport))
++			// @MOD C++/CX
++			// if (value == CppLanguageKind.CppCx || (value == CppLanguageKind.CppCli && !globalCache.GlobalCache.EnableCppCliSupport))
++			if ((value == CppLanguageKind.CppCli || value == CppLanguageKind.CppCx) && !globalCache.GlobalCache.EnableCppCliSupport)
+ 			{
+ 				logger = globalCache.GetLogger();
+ 				ILogger logger2 = logger;
+@@ -143,7 +145,7 @@ public static class CppInclusionContextUtil
+ 		}
+ 		logger3.Trace(ref messageHandler2);
+ 		ISymbolScope clrSymbolScope;
+-		if (languageDialect.LanguageKind == CppLanguageKind.CppCli)
++		if (languageDialect.LanguageKind == CppLanguageKind.CppCli || languageDialect.LanguageKind == CppLanguageKind.CppCx) // @MOD C++/CX
+ 		{
+ 			if (!ClrCacheIsReady(globalCache))
+ 			{

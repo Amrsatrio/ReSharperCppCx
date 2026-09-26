@@ -1,0 +1,24 @@
+diff --git a/JetBrains.ReSharper.Feature.Services.Cpp.Daemon/CppClassSpecifierErrorsAnalyzer.cs b/JetBrains.ReSharper.Feature.Services.Cpp.Daemon/CppClassSpecifierErrorsAnalyzer.cs
+index 0bca410b6e8c4746177cab5e3a31f90e21136cb0..a4c629f0309508face1bf564c88226b75754f74e 100644
+--- a/JetBrains.ReSharper.Feature.Services.Cpp.Daemon/CppClassSpecifierErrorsAnalyzer.cs
++++ b/JetBrains.ReSharper.Feature.Services.Cpp.Daemon/CppClassSpecifierErrorsAnalyzer.cs
+@@ -36,12 +36,18 @@ namespace JetBrains.ReSharper.Feature.Services.Cpp.Daemon;
+ 	typeof(CppFirstClassDeclarationNotExportedError),
+ 	typeof(CppRedefinitionOfClassFromOtherModuleError),
+ 	typeof(CppTemplateParametersErrorsAnalyzer),
+-	typeof(CppClassesErrorsAnalyzerUtil)
++	typeof(CppClassesErrorsAnalyzerUtil),
++	typeof(CppSyntaxError)
+ })]
+ public class CppClassSpecifierErrorsAnalyzer : IElementProblemAnalyzer
+ {
+ 	public virtual void Run(ITreeNode node, ElementProblemAnalyzerData data, IHighlightingConsumer consumer)
+ 	{
++		string cxError = CppTreeModificationUtil.GetCxPublicRefClassDeclarationError(node);
++		if (cxError != null)
++		{
++			consumer.AddHighlighting(new CppSyntaxError(cxError, node.GetDocumentRange()));
++		}
+ 		IClassOrEnumSpecifier classOrEnumSpecifier = (IClassOrEnumSpecifier)node;
+ 		CppViewPos viewPos = classOrEnumSpecifier.GetViewPos();
+ 		ICppClassResolveEntity classResolveEntity = classOrEnumSpecifier.GetClassResolveEntity();

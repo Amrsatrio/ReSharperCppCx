@@ -1,0 +1,24 @@
+diff --git a/JetBrains.ReSharper.Feature.Services.Cpp.CodeStyle.Suggestions/CppOverridingFunctionStyleSuggestion.cs b/JetBrains.ReSharper.Feature.Services.Cpp.CodeStyle.Suggestions/CppOverridingFunctionStyleSuggestion.cs
+index f3bd16700eb3cbabbf1f23ecf7d1709ff97f1dfe..db26f1b33bae42e871bce61c43e13b2c5ebb0d8a 100644
+--- a/JetBrains.ReSharper.Feature.Services.Cpp.CodeStyle.Suggestions/CppOverridingFunctionStyleSuggestion.cs
++++ b/JetBrains.ReSharper.Feature.Services.Cpp.CodeStyle.Suggestions/CppOverridingFunctionStyleSuggestion.cs
+@@ -138,6 +138,10 @@ public class CppOverridingFunctionStyleSuggestion : CodeStyleSuggestion<Declarat
+ 		{
+ 			return false;
+ 		}
++		if (RemoveVirtual && CppTreeModificationUtil.IsCxPublicDestructor(DeclaratorNode))
++		{
++			return false;
++		}
+ 		if (AddVirtual)
+ 		{
+ 			Declaration declarationNode = DeclarationNode;
+@@ -163,7 +167,7 @@ public class CppOverridingFunctionStyleSuggestion : CodeStyleSuggestion<Declarat
+ 
+ 	protected override bool CanBeApplied()
+ 	{
+-		return true;
++		return !RemoveVirtual || !CppTreeModificationUtil.IsCxPublicDestructor(DeclaratorNode);
+ 	}
+ 
+ 	protected override ITreeNode ApplySuggestion(Declarator targetNode)

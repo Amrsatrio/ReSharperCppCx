@@ -1,0 +1,22 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppCxxCliClrPropertyResolveEntity.cs b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppCxxCliClrPropertyResolveEntity.cs
+index f5718d4e2ffd99361265a274dcaa001aa47a3e02..d873f7aaf43e920f9ae3c423f8da12fb5bcbec47 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppCxxCliClrPropertyResolveEntity.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppCxxCliClrPropertyResolveEntity.cs
+@@ -17,7 +17,7 @@ public sealed class CppCxxCliClrPropertyResolveEntity : CppCxxCliPropertyResolve
+ 	public IClrDeclaredElement ClrDeclaredElement => myTypeMember;
+ 
+ 	public CppCxxCliClrPropertyResolveEntity(ICppResolveEntityParentScope parent, IProperty prop, in CppClrTypeConverter cvt)
+-		: base(parent, CppClrNameConverter.ConvertName(prop), CppLocationAnchor.GeneratedEntity(), cvt.ConvertType(prop.Type))
++		: base(parent, CppClrNameConverter.ConvertName(prop), CppLocationAnchor.GeneratedEntity(), cvt.ConvertMemberType(prop)) // @MOD C++/CX
+ 	{
+ 		myTypeMember = prop;
+ 		DeclarationSpecifiers = CppClrTypeConverter.CalculateDeclarationSpecifiers(prop);
+@@ -31,7 +31,7 @@ public sealed class CppCxxCliClrPropertyResolveEntity : CppCxxCliPropertyResolve
+ 	}
+ 
+ 	public CppCxxCliClrPropertyResolveEntity(ICppResolveEntityParentScope parent, IEvent @event, in CppClrTypeConverter cvt)
+-		: base(parent, CppClrNameConverter.ConvertName(@event), CppLocationAnchor.GeneratedEntity(), cvt.ConvertType(@event.Type))
++		: base(parent, CppClrNameConverter.ConvertName(@event), CppLocationAnchor.GeneratedEntity(), cvt.ConvertMemberType(@event)) // @MOD C++/CX
+ 	{
+ 		myTypeMember = @event;
+ 		DeclarationSpecifiers = CppClrTypeConverter.CalculateDeclarationSpecifiers(@event);

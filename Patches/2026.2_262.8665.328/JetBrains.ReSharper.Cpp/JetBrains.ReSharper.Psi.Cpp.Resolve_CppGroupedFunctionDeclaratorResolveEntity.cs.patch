@@ -1,0 +1,14 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Resolve/CppGroupedFunctionDeclaratorResolveEntity.cs b/JetBrains.ReSharper.Psi.Cpp.Resolve/CppGroupedFunctionDeclaratorResolveEntity.cs
+index 60c5052d851a53752dc8e597ede6d1646b30890b..76be820313dde439e9c30690eba9101aaacee6d9 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Resolve/CppGroupedFunctionDeclaratorResolveEntity.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Resolve/CppGroupedFunctionDeclaratorResolveEntity.cs
+@@ -450,7 +450,8 @@ public class CppGroupedFunctionDeclaratorResolveEntity : ICppGroupedFunctionDecl
+ 				if (cppCallingConvention == CppCallingConvention.UNSPECIFIED)
+ 				{
+ 					CppLanguageDialect dialect = typeIntern.GetDialect();
+-					cppCallingConvention = ((this.GetClassByMember() == null) ? dialect.DefaultCallingConvention : ((!cppFunctionOrVariableDeclaratorResolveEntity.IsCliClassOrInterfaceMember()) ? ((!cppFunctionOrVariableDeclaratorResolveEntity.DeclarationSpecifiers.IsStatic() && !cppFunctionType.HasExplicitThisParameter()) ? dialect.DefaultMemberCallingConvention : dialect.DefaultCallingConvention) : CppCallingConvention.CLRCALL));
++					// @MOD C++/CX: WinRT methods use native calling conventions, unlike CLR methods.
++					cppCallingConvention = ((this.GetClassByMember() == null) ? dialect.DefaultCallingConvention : ((dialect.LanguageKind == CppLanguageKind.CppCx || !cppFunctionOrVariableDeclaratorResolveEntity.IsCliClassOrInterfaceMember()) ? ((!cppFunctionOrVariableDeclaratorResolveEntity.DeclarationSpecifiers.IsStatic() && !cppFunctionType.HasExplicitThisParameter()) ? dialect.DefaultMemberCallingConvention : dialect.DefaultCallingConvention) : CppCallingConvention.CLRCALL));
+ 				}
+ 				bool num = cppQualType.InternalType is CppFunctionWithTrailingReturnType;
+ 				cppQualType = typeIntern.GetFunctionType(cppQualType2, cppFunctionType.ParameterTypes, cppFunctionType.Flags.WithCallingConvention(cppCallingConvention.DecorateAsImplicit()), cppExceptionSpecification).WithAppendedQuals(cppQualType.TypeQualifiers);

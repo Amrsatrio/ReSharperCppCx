@@ -1,0 +1,20 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Parsing/CppTokenKind.cs b/JetBrains.ReSharper.Psi.Cpp.Parsing/CppTokenKind.cs
+index a7165c5e215611d54fee572e43706700b058149e..c9b292535b4a3565a4950d797fd3c8e5066b3645 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Parsing/CppTokenKind.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Parsing/CppTokenKind.cs
+@@ -2,6 +2,15 @@ namespace JetBrains.ReSharper.Psi.Cpp.Parsing;
+ 
+ public enum CppTokenKind : short
+ {
++	// @MOD C++/CX
++	CXXCX_PARTIAL_KEYWORD = _NUMBER_OF_ELEMENTS_,
++	__IS_WIN_CLASS,
++	__IS_WIN_INTERFACE,
++	__IS_WINRT_AGILE,
++	__IS_VALID_WINRT_TYPE,
++
++	_NUMBER_OF_ELEMENTS_CX_,
++
+ 	INVALID = -1,
+ 	EOF = 10,
+ 	WHITE_SPACE = 11,

@@ -1,0 +1,25 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppSymbolEqualsVisitor.cs b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppSymbolEqualsVisitor.cs
+index ebf3e51a692a5af3f96fcc4cfa44099b01fb00b0..f6e6cb6bbdde28f6a7a0c4e46092851340341108 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppSymbolEqualsVisitor.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppSymbolEqualsVisitor.cs
+@@ -26,6 +26,11 @@ public class CppSymbolEqualsVisitor : ICppSymbolVisitor<bool>
+ 		{
+ 			return false;
+ 		}
++		// @MOD C++/CX: changing partial to final changes class composition even with identical members.
++		if (lhs.IsCxPartial != cppClassSymbol.IsCxPartial)
++		{
++			return false;
++		}
+ 		if (lhs.Key != cppClassSymbol.Key || !AnchorDeltaAreEqual(lhs, cppClassSymbol) || !BaseDescriptionListsAreEqual(lhs.GetBases(), cppClassSymbol.GetBases()) || !TemplateParameterSymbolsListsAreEqual(lhs.ParamList(), cppClassSymbol.ParamList()) || !VisitDefinitionClassSymbol(lhs, cppClassSymbol) || lhs.IsExplicitInstantiation != cppClassSymbol.IsExplicitInstantiation || !Engine.AttributeListsAreEqual(lhs.Attributes(), cppClassSymbol.Attributes()))
+ 		{
+ 			return false;
+@@ -48,7 +53,7 @@ public class CppSymbolEqualsVisitor : ICppSymbolVisitor<bool>
+ 
+ 	public bool Visit(CppDeserializedFromModuleClassSymbol lhs)
+ 	{
+-		return VisitSymbol(lhs);
++		return lhs.IsCxPartial == CppClassSymbolUtil.IsCxPartial(Rhs as ICppClassOrDelegateSymbolOrModuleEntity) && VisitSymbol(lhs); // @MOD C++/CX
+ 	}
+ 
+ 	public virtual bool Visit(CppEnumWithBaseSymbol lhs)

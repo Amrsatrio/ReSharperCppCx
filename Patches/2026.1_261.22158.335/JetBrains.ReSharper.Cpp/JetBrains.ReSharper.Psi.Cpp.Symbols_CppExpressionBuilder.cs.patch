@@ -1,0 +1,13 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppExpressionBuilder.cs b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppExpressionBuilder.cs
+index 942c9c5d9970f95f08fe91d9b39911a1a7afa6c6..ba085581323f362fea1e0b6e3edb8508d0b8ad9a 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppExpressionBuilder.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppExpressionBuilder.cs
+@@ -238,7 +238,7 @@ public struct CppExpressionBuilder(bool createSymbols) : ICppExpressionBuilder<C
+ 
+ 	public void LearnCliTypeId(ref CppQualifiedNameBuilder nameBuilder)
+ 	{
+-		myExpr = new CppQualifiedReferenceExpression(nameBuilder.GetRawName().NameForReference());
++		myExpr = new CppCliTypeIdExpression(nameBuilder.GetRawName().NameForReference()); // @MOD C++/CX
+ 	}
+ 
+ 	public void ApplyBinaryOperator(CppOperatorKind kind, ref CppExpressionBuilder exprBuilder)

@@ -1,0 +1,15 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Caches/CppIncludesGraphCache.cs b/JetBrains.ReSharper.Psi.Cpp.Caches/CppIncludesGraphCache.cs
+index 8b5db5a3df42ec28885b91a6f9ca7abfbce3e201..9a05c24c2e80cb01e0258473acdd3a5c0b5db91d 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Caches/CppIncludesGraphCache.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Caches/CppIncludesGraphCache.cs
+@@ -186,6 +186,10 @@ public class CppIncludesGraphCache
+ 
+ 	public CppIncludesGraphCache(CppGlobalSymbolCache globalSymbolCache, int formatVersion, IPsiConfiguration psiConfiguration)
+ 	{
++		if (formatVersion == CppGlobalSymbolCache.CACHE_FORMAT_VERSION_ORIGINAL) // @MOD C++/CX
++		{
++			formatVersion = CppGlobalSymbolCache.CACHE_FORMAT_VERSION_CX;
++		}
+ 		myGlobalSymbolCache = globalSymbolCache;
+ 		myLock = new LockObject();
+ 		myFormatVersion = formatVersion;

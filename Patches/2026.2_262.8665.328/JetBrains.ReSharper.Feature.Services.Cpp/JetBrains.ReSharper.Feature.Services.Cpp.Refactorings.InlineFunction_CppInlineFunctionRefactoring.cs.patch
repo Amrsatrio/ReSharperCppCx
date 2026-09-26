@@ -1,0 +1,110 @@
+diff --git a/JetBrains.ReSharper.Feature.Services.Cpp.Refactorings.InlineFunction/CppInlineFunctionRefactoring.cs b/JetBrains.ReSharper.Feature.Services.Cpp.Refactorings.InlineFunction/CppInlineFunctionRefactoring.cs
+index 69af34c3313ffbacbf111291a61adfa692f057bd..abef3e65b031f4c523c378e2ed64d9b3a5c14634 100644
+--- a/JetBrains.ReSharper.Feature.Services.Cpp.Refactorings.InlineFunction/CppInlineFunctionRefactoring.cs
++++ b/JetBrains.ReSharper.Feature.Services.Cpp.Refactorings.InlineFunction/CppInlineFunctionRefactoring.cs
+@@ -445,7 +445,7 @@ internal class CppInlineFunctionRefactoring : DrivenRefactoringBase<CppInlineFun
+ 				replaceData.RenameConflictingEntities(compoundStatement);
+ 			}
+ 			ITreeNodePointer<DeclarationStatement> declStatementPointer = declStatement.CreateTreeElementPointer();
+-			BodyInliningStatus bodyInliningStatus = UpdateInlinedFunctionBodyForAssignment(replaceData, compoundStatement, name, LabelKind.Initialization, newCompoundStatementCreated, compoundStatementIsLast, out var _, out var _, out var includeUtilityHeader);
++			BodyInliningStatus bodyInliningStatus = UpdateInlinedFunctionBodyForAssignment(replaceData, compoundStatement, name, LabelKind.Initialization, newCompoundStatementCreated, compoundStatementIsLast, out var ret /*@MOD Fix compile*/, out var _, out var includeUtilityHeader);
+ 			declStatement = declStatementPointer.GetTreeNode().NotNull("declStatementPointer.GetTreeNode()");
+ 			initDecl = (InitDeclarator)CppReferenceBinder.FindReplacement(declStatement, trace);
+ 			switch (bodyInliningStatus)
+@@ -491,27 +491,27 @@ internal class CppInlineFunctionRefactoring : DrivenRefactoringBase<CppInlineFun
+ 				replaceData.IncludeUtilityHeader();
+ 			}
+ 			return true;
+-		}
+-		ICppStatement ReplaceAssignmentToInitialization()
+-		{
+-			ICppExpressionNode cppExpressionNode = P_0.ret.FindChildByType<ICppExpressionNode>(CppCompositeNodeTypes.EXPRESSIONS, 1);
+-			ICppStatement result = P_0.ret;
+-			if (typeIsDeduced && P_0.replaceData.HasReturnsWithImplicitConversion())
+-			{
+-				IPsiSourceFile sourceFile = declStatement.GetSourceFile();
+-				ITreeNodePointer<ICppExpressionNode> treeNodePointer = cppExpressionNode.CreateTreeElementPointer();
+-				ITreeNodePointer<InitDeclarator> treeNodePointer2 = initDecl.CreateTreeElementPointer();
+-				base.Workflow.Solution.GetComponent<ICppTransactionUtil>().ReparsePendingChanges(sourceFile);
+-				cppExpressionNode = treeNodePointer.GetTreeNode().NotNull("valuePtr.GetTreeNode()");
+-				initDecl = treeNodePointer2.GetTreeNode().NotNull("initDeclPtr.GetTreeNode()");
+-				declStatement = P_0.declStatementPointer.GetTreeNode();
+-				result = ExpressionStatementNavigator.GetByExpression(BinaryExpressionNavigator.GetByRightOperand(cppExpressionNode));
+-				cppExpressionNode = CppInlineVarWorkflow.CreateWrappedValue(initDecl.GetResolveEntity().GetCppType(), cppExpressionNode, TriBool.False);
+-			}
+-			using (WriteLockCookie.Create("Src\\Refactorings\\InlineFunction\\CppInlineFunctionRefactoring.cs", "InlineInitializer"))
++			ICppStatement ReplaceAssignmentToInitialization() // @MOD Fix compile
+ 			{
+-				CppModificationUtil.ReplaceChild(initDecl.Initializer, cppExpressionNode);
+-				return result;
++				ICppExpressionNode cppExpressionNode = ret.FindChildByType<ICppExpressionNode>(CppCompositeNodeTypes.EXPRESSIONS, 1); // @MOD Fix compile
++				ICppStatement result = ret;
++				if (typeIsDeduced && replaceData.HasReturnsWithImplicitConversion())
++				{
++					IPsiSourceFile sourceFile = declStatement.GetSourceFile();
++					ITreeNodePointer<ICppExpressionNode> treeNodePointer = cppExpressionNode.CreateTreeElementPointer();
++					ITreeNodePointer<InitDeclarator> treeNodePointer2 = initDecl.CreateTreeElementPointer();
++					base.Workflow.Solution.GetComponent<ICppTransactionUtil>().ReparsePendingChanges(sourceFile);
++					cppExpressionNode = treeNodePointer.GetTreeNode().NotNull("valuePtr.GetTreeNode()");
++					initDecl = treeNodePointer2.GetTreeNode().NotNull("initDeclPtr.GetTreeNode()");
++					declStatement = declStatementPointer.GetTreeNode();
++					result = ExpressionStatementNavigator.GetByExpression(BinaryExpressionNavigator.GetByRightOperand(cppExpressionNode));
++					cppExpressionNode = CppInlineVarWorkflow.CreateWrappedValue(initDecl.GetResolveEntity().GetCppType(), cppExpressionNode, TriBool.False);
++				}
++				using (WriteLockCookie.Create("Src\\Refactorings\\InlineFunction\\CppInlineFunctionRefactoring.cs", "InlineInitializer"))
++				{
++					CppModificationUtil.ReplaceChild(initDecl.Initializer, cppExpressionNode);
++					return result;
++				}
+ 			}
+ 		}
+ 	}
+@@ -563,7 +563,7 @@ internal class CppInlineFunctionRefactoring : DrivenRefactoringBase<CppInlineFun
+ 		bool needMove = callSite.NeedMove(verboseTypeAndCategory, in callSiteViewPos);
+ 		CppFile file = callSiteStatement.GetContainingFile();
+ 		string labelName = GetInliningFunctionExitLabel(callInfo);
+-		_003C_003Ec__DisplayClass12_0 CS_0024_003C_003E8__locals1;
++		// _003C_003Ec__DisplayClass12_0 CS_0024_003C_003E8__locals1; // @MOD Fix compile
+ 		if (introducingVarIsDefaultConstructible || base.Workflow.References.IsSingleCallSite)
+ 		{
+ 			return DoExecute();
+@@ -571,11 +571,12 @@ internal class CppInlineFunctionRefactoring : DrivenRefactoringBase<CppInlineFun
+ 		return PsiTransactionCookie.ExecuteConditionally(base.Solution.GetPsiServices(), DoExecute, "Inline Initializer");
+ 		bool DoExecute()
+ 		{
++			CppElementFactory ef = replaceData.ElementFactory; // @MOD Fix compile
+ 			bool newCompoundStatementCreated;
+ 			CompoundStatement compoundStatement;
+ 			using (WriteLockCookie.Create("Src\\Refactorings\\InlineFunction\\CppInlineFunctionRefactoring.cs", "IntroduceVariableAndInlineInitializer"))
+ 			{
+-				newCompoundStatementCreated = Utility.EnsureBraces(ref callSiteStatement, (CppElementFactory)(object)CS_0024_003C_003E8__locals1);
++				newCompoundStatementCreated = Utility.EnsureBraces(ref callSiteStatement, ef); // @MOD Fix compile
+ 				compoundStatement = CppModificationUtil.AddChild(callSiteStatement, replaceData.Body, CppAddChildMode.ADD_BEFORE_ANCHOR);
+ 				replaceData.RenameConflictingEntities(compoundStatement);
+ 			}
+@@ -618,7 +619,7 @@ internal class CppInlineFunctionRefactoring : DrivenRefactoringBase<CppInlineFun
+ 				using (WriteLockCookie.Create("Src\\Refactorings\\InlineFunction\\CppInlineFunctionRefactoring.cs", "IntroduceVariableAndInlineInitializer"))
+ 				{
+ 					ICppStatement anchor = (insertedStatements.IsEmpty() ? callSiteStatement : insertedStatements[0]);
+-					ICppStatement child = ((CppElementFactory)(object)CS_0024_003C_003E8__locals1).CreateStatementWithoutPreprocessing(declarationText + ";");
++					ICppStatement child = ef.CreateStatementWithoutPreprocessing(declarationText + ";"); // @MOD Fix compile
+ 					CppModificationUtil.AddChild(anchor, child, CppAddChildMode.ADD_BEFORE_ANCHOR);
+ 					ReplaceCallSiteTo(name);
+ 				}
+@@ -661,11 +662,11 @@ internal class CppInlineFunctionRefactoring : DrivenRefactoringBase<CppInlineFun
+ 				}
+ 			}
+ 			return true;
+-		}
+-		void ReplaceCallSiteTo(string var)
+-		{
+-			string text = (needMove ? var.WrapToMove(file, ref P_1.includeUtilityHeader) : var);
+-			CppModificationUtil.ReplaceChild(callSite, P_1.ef.CreateExpressionWithoutPreprocessing(text));
++			void ReplaceCallSiteTo(string var) // @MOD Fix compile
++			{
++				string text = (needMove ? var.WrapToMove(file, ref includeUtilityHeader) : var);
++				CppModificationUtil.ReplaceChild(callSite, ef.CreateExpressionWithoutPreprocessing(text));
++			}
+ 		}
+ 	}
+ 

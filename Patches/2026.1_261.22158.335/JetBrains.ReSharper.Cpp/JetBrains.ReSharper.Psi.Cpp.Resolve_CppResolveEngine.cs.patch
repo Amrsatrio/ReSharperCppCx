@@ -1,0 +1,34 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Resolve/CppResolveEngine.cs b/JetBrains.ReSharper.Psi.Cpp.Resolve/CppResolveEngine.cs
+index 295e9720be5d7962b0574e52bc8fe71efe3d37ee..25aa399234cf2f86d063547040a00cc5040fee41 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Resolve/CppResolveEngine.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Resolve/CppResolveEngine.cs
+@@ -517,7 +517,8 @@ public class CppResolveEngine
+ 			return CppResolveResult.NotResolved();
+ 		}
+ 		ICppResolvedTypeFactory typeFactory = TypeFactory;
+-		if (typeFactory.GetDialect().LanguageKind == CppLanguageKind.CppCli && CppExpressionsUtil.IsCliEventSubscription(kind, leftOp, out var prop))
++		CppLanguageKind languageKind = typeFactory.GetDialect().LanguageKind;
++		if (languageKind is CppLanguageKind.CppCli or CppLanguageKind.CppCx && CppExpressionsUtil.IsCliEventSubscription(kind, leftOp, out var prop))
+ 		{
+ 			ICppGroupedFunctionDeclaratorResolveEntity cppGroupedFunctionDeclaratorResolveEntity = CppCxxCliPropertyDeclaratorResolveEntityUtil.ResolveFunction(prop, kind);
+ 			if (cppGroupedFunctionDeclaratorResolveEntity != null)
+@@ -539,6 +540,19 @@ public class CppResolveEngine
+ 				}
+ 				typeAndCategory = CppTypeAndCategory.MakePRValue(cppTypeAndCategory.Type);
+ 			}
++			else if (kind == CppOperatorKind.EQ && languageKind == CppLanguageKind.CppCx
++				&& cppTypeAndCategory.Type.IsCliValueClassType() && rightOp is ICppResolvedBracedInitListExpression)
++			{
++				// @MOD C++/CX: value assignment is builtin, but its braced RHS must
++				// initialize a value before the builtin assignment checks its type.
++				CppImplicitConversionSequence conversion = new CppExpressionInfo(rightOp, typeAndCategory)
++					.DoConversion(cppTypeAndCategory.Type, CppConversionParameters.ForCopyInitDecl, in TypeContext);
++				if (conversion.IsFailureConversion())
++				{
++					return CppResolveResult.NotResolved();
++				}
++				typeAndCategory = CppTypeAndCategory.MakePRValue(cppTypeAndCategory.Type);
++			}
+ 			if (cppTypeAndCategory.Type.GetDependentInfo().IsTypeOrUnknownDependent())
+ 			{
+ 				return CppResolveResult.NotResolved();

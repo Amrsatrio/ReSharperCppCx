@@ -1,0 +1,13 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClrLinkageEntityFactory.cs b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClrLinkageEntityFactory.cs
+index 5e74e825f9f1ccd17a926b1cf446824303af051b..d6c94ee3ec492b9af6d00f4f2afb3f0887a2b104 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClrLinkageEntityFactory.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClrLinkageEntityFactory.cs
+@@ -92,7 +92,7 @@ public sealed class CppClrLinkageEntityFactory
+ 					}
+ 					return cppQualType;
+ 				}
+-				CppPredefinedType predefinedType = CppClrTypeConverter.GetPredefinedType(typeElement, out var found);
++				CppPredefinedType predefinedType = myFactory.GetDialect().LanguageKind == CppLanguageKind.CppCx ? CppClrTypeConverter.GetPredefinedType(typeElement, out var found) : CppClrTypeConverter.GetPredefinedType(typeElement, out found); // @MOD C++/CX
+ 				if (found)
+ 				{
+ 					cppQualType = CppPredefinedTypes.GetPredefinedType(predefinedType);

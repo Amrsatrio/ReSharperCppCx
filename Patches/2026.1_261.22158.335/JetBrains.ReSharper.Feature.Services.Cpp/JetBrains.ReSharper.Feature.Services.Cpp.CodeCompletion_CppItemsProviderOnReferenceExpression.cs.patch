@@ -1,0 +1,40 @@
+diff --git a/JetBrains.ReSharper.Feature.Services.Cpp.CodeCompletion/CppItemsProviderOnReferenceExpression.cs b/JetBrains.ReSharper.Feature.Services.Cpp.CodeCompletion/CppItemsProviderOnReferenceExpression.cs
+index 822c38bafef863f01bbd3df1f641b4893bdfee45..d9abf85718423bf1db45b5efdd3ff477a8647f2e 100644
+--- a/JetBrains.ReSharper.Feature.Services.Cpp.CodeCompletion/CppItemsProviderOnReferenceExpression.cs
++++ b/JetBrains.ReSharper.Feature.Services.Cpp.CodeCompletion/CppItemsProviderOnReferenceExpression.cs
+@@ -409,7 +409,10 @@ public class CppItemsProviderOnReferenceExpression : ItemsProviderOfSpecificCont
+ 					{
+ 						if (!(subscriptDesignator.Parent is Designation designation))
+ 						{
+-							goto IL_00c3;
++							// @MOD Fix compile
++							node = cppExpressionNode.GetOutermostParenExpression();
++							flag2 = false;
++							goto IL_00cf;
+ 						}
+ 						node = designation;
+ 						flag2 = true;
+@@ -418,7 +421,10 @@ public class CppItemsProviderOnReferenceExpression : ItemsProviderOfSpecificCont
+ 					{
+ 						if (!(parent is SubscriptRangeDesignator { Parent: Designation parent2 }))
+ 						{
+-							goto IL_00c3;
++							// @MOD Fix compile
++							node = cppExpressionNode.GetOutermostParenExpression();
++							flag2 = false;
++							goto IL_00cf;
+ 						}
+ 						node = parent2;
+ 						flag2 = true;
+@@ -472,10 +478,7 @@ public class CppItemsProviderOnReferenceExpression : ItemsProviderOfSpecificCont
+ 			}
+ 		}
+ 		goto IL_0226;
+-		IL_00c3:
+-		node = cppExpressionNode.GetOutermostParenExpression();
+-		flag2 = false;
+-		goto IL_00cf;
++		// @MOD Fix compile
+ 		IL_0226:
+ 		if (isAccessExpression)
+ 		{

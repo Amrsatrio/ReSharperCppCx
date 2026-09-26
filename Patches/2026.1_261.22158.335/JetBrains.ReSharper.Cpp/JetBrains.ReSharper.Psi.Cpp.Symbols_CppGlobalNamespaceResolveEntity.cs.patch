@@ -1,0 +1,57 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppGlobalNamespaceResolveEntity.cs b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppGlobalNamespaceResolveEntity.cs
+index 48097c1db5ec71ee19c5afd7ce86907d331721c4..cf33537281c3848a011d9b387335dbdb36ed9144 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppGlobalNamespaceResolveEntity.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppGlobalNamespaceResolveEntity.cs
+@@ -71,6 +71,52 @@ public class CppGlobalNamespaceResolveEntity : CppClrNamespaceResolveEntity
+ 		public ICppClassResolveEntity pssl_sampler_state;
+ 
+ 		public ICppClassResolveEntity pssl_sampler_comparison_state;
++
++		// @MOD C++/CX
++		public CppNamespaceResolveEntity cx_platform_ns;
++		public ICppClassResolveEntity cx_platform_object;
++		public ICppClassResolveEntity cx_platform_string;
++		public ICppClassResolveEntity cx_platform_valuetype;
++		public ICppClassResolveEntity cx_platform_enum;
++		public ICppClassResolveEntity cx_platform_idisposable;
++		public ICppClassResolveEntity cx_platform_type;
++		public ICppClassResolveEntity cx_platform_delegate;
++		public CppNamespaceResolveEntity cx_default_ns;
++		public HashMap<CppNumericTypeKind, ICppClassResolveEntity> cx_numtypes;
++		public ICppClassResolveEntity GetManagedObject(Language.CppLanguageKind kind) => kind == Language.CppLanguageKind.CppCx ? cx_platform_object : cli_system_object;
++		public ICppClassResolveEntity GetManagedString(Language.CppLanguageKind kind) => kind == Language.CppLanguageKind.CppCx ? cx_platform_string : cli_system_string;
++		public ICppClassResolveEntity GetManagedValueType(Language.CppLanguageKind kind) => kind == Language.CppLanguageKind.CppCx ? cx_platform_valuetype : cli_system_valuetype;
++		public ICppClassResolveEntity GetManagedEnum(Language.CppLanguageKind kind) => kind == Language.CppLanguageKind.CppCx ? cx_platform_enum : cli_system_enum;
++		public ICppClassResolveEntity GetManagedDisposable(Language.CppLanguageKind kind) => kind == Language.CppLanguageKind.CppCx ? cx_platform_idisposable : cli_system_idisposable;
++		public ICppClassResolveEntity GetManagedDelegate(Language.CppLanguageKind kind) => kind == Language.CppLanguageKind.CppCx ? cx_platform_delegate : cli_system_multicast_delegate;
++		public HashMap<CppNumericTypeKind, ICppClassResolveEntity> GetManagedNumTypes(Language.CppLanguageKind kind) => kind == Language.CppLanguageKind.CppCx ? cx_numtypes : cli_system_numtypes;
++
++		// @MOD C++/CX
++		public ICppClassResolveEntity GetCppCxProjectedBuiltin(Metadata.Reader.API.IClrTypeName clrName)
++		{
++			if (Metadata.Reader.API.ClrTypeNameExtensions.GetNamespaceName(clrName) != "System")
++				return null;
++
++			switch (clrName.ShortName)
++			{
++				case "Object":
++					return cx_platform_object;
++				case "String":
++					return cx_platform_string;
++				case "ValueType":
++					return cx_platform_valuetype;
++				case "Enum":
++					return cx_platform_enum;
++				case "IDisposable":
++					return cx_platform_idisposable;
++				case "Type":
++					return cx_platform_type;
++				case "Delegate":
++					return cx_platform_delegate;
++				default:
++					return null;
++			}
++		}
+ 	}
+ 
+ 	private readonly CppBuiltinsRefs myBuiltinsRefs;

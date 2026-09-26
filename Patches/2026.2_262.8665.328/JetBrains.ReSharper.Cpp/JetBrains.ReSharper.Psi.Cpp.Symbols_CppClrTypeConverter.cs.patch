@@ -1,0 +1,857 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClrTypeConverter.cs b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClrTypeConverter.cs
+index 43543699d5c31ecc57a4590f14e058000f2e621a..c26c84d174a29cefe0ac20867e7ac3798369122e 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClrTypeConverter.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClrTypeConverter.cs
+@@ -8,6 +8,23 @@ using JetBrains.ReSharper.Psi.Cpp.Types;
+ using JetBrains.ReSharper.Psi.Resolve;
+ using JetBrains.Util.Collections;
+ 
++// @MOD C++/CX Imports
++using System.Linq;
++using JetBrains.Metadata.Reader.Impl;
++using JetBrains.ReSharper.Psi.Cpp.Language;
++using JetBrains.ReSharper.Psi.Cpp.Lookup;
++using JetBrains.ReSharper.Psi.Cpp.Resolve;
++using JetBrains.ReSharper.Psi.Impl.Reflection2.WinMD;
++using JetBrains.ReSharper.Psi.Impl.Types;
++using JetBrains.ReSharper.Psi.Impl.Reflection2;
++using JetBrains.Metadata.Access;
++using JetBrains.Metadata.Utils;
++using JetBrains.ReSharper.Psi.Modules;
++using JetBrains.Util;
++using JetBrains.Util.Reflection;
++using JetBrains.Util.DataStructures;
++using JetBrains.ReSharper.Psi.Caches.SymbolCache;
++
+ namespace JetBrains.ReSharper.Psi.Cpp.Symbols;
+ 
+ public readonly struct CppClrTypeConverter
+@@ -37,6 +54,12 @@ public readonly struct CppClrTypeConverter
+ 
+ 		public override CppQualType VisitArrayType(IArrayType arrayType, TypeConversionContext context)
+ 		{
++			// @MOD C++/CX: WinRT arrays use vccorlib.h's actual class templates,
++			// not the unrelated cli::array type used by C++/CLI.
++			if (cvt.TypeFactory.GetDialect().LanguageKind == CppLanguageKind.CppCx)
++			{
++				return cvt.ConvertCppCxArrayType(arrayType, context.nohandle);
++			}
+ 			CppQualType t = arrayType.ElementType.Accept(this, new TypeConversionContext(nohandle: false, constptr: false));
+ 			ICppExpression rankExpr = CppIntegralValues.Int.Create(arrayType.Rank);
+ 			CppType internalType = cvt.TypeFactory.GetCliArrayType(t, rankExpr);
+@@ -78,6 +101,14 @@ public readonly struct CppClrTypeConverter
+ 
+ 		public override CppQualType VisitDeclaredType(IDeclaredType declaredType, TypeConversionContext context)
+ 		{
++			if (cvt.TypeFactory.GetDialect().LanguageKind == CppLanguageKind.CppCx) // @MOD C++/CX
++			{
++				CppQualType projected = TryConvertCppCxDeclaredType(declaredType, context);
++				if (!projected.IsNullType())
++				{
++					return projected;
++				}
++			}
+ 			IResolveResult resolveResult = declaredType.Resolve();
+ 			if (resolveResult.DeclaredElement is ITypeElement typeElement)
+ 			{
+@@ -104,7 +135,7 @@ public readonly struct CppClrTypeConverter
+ 							return result;
+ 						}
+ 						CppQualType cppQualType = new CppQualType(cppClassResolveEntity);
+-						if (!context.nohandle && declaredType.Classify == TypeClassification.REFERENCE_TYPE)
++						if (!context.nohandle && (cvt.TypeFactory.GetDialect().LanguageKind == CppLanguageKind.CppCx ? cppClassResolveEntity.GetKey().IsCliRefClassOrInterface() : declaredType.Classify == TypeClassification.REFERENCE_TYPE)) // @MOD C++/CX
+ 						{
+ 							cppQualType = ((!IsImplicitlyDereferencedType(declaredType)) ? new CppQualType(cvt.TypeFactory.GetCliHandleType(cppQualType)) : cppQualType.WithChangedRefFlag(ReferenceFlag.CliTracking));
+ 						}
+@@ -118,12 +149,48 @@ public readonly struct CppClrTypeConverter
+ 			}
+ 			return DUMMY;
+ 		}
++
++		// @MOD C++/CX
++		private CppQualType TryConvertCppCxDeclaredType(IDeclaredType declaredType, TypeConversionContext context)
++		{
++			IClrTypeName clrName = declaredType.GetClrName();
++			CppPredefinedType predefinedType = GetPredefinedTypeCx(clrName, cvt.TypeFactory.GetDialect(), out bool found);
++			if (found)
++			{
++				CppQualType primitive = CppPredefinedTypes.GetPredefinedType(predefinedType);
++				return HasConstModifier(declaredType) ? primitive.WithAppendedCVQuals(CVQualifiers.Const) : primitive;
++			}
++			// The metadata placeholder names the native GUID, not a managed value class.
++			if (clrName.FullName == "Platform.Details._GUID")
++			{
++				return new CppQualType(cvt.GlobalNamespace.GetBuiltinsRefs().guid, HasConstModifier(declaredType) ? Qualifiers.Const : Qualifiers.None);
++			}
++			ICppClassResolveEntity projected = cvt.GlobalNamespace.GetBuiltinsRefs().GetCppCxProjectedBuiltin(clrName)
++				?? cvt.LookupCppCxClass(declaredType);
++			if (projected == null)
++			{
++				return CppQualType.NullType();
++			}
++			CppQualType projectedType = new CppQualType(projected);
++			if (!context.nohandle && projected.GetKey().IsCliRefClassOrInterface())
++			{
++				projectedType = IsImplicitlyDereferencedType(declaredType) ? projectedType.WithChangedRefFlag(ReferenceFlag.CliTracking) : new CppQualType(cvt.TypeFactory.GetCliHandleType(projectedType));
++			}
++			if (HasConstModifier(declaredType))
++			{
++				projectedType = projectedType.WithAppendedCVQuals(CVQualifiers.Const);
++			}
++			return projectedType;
++		}
++
+ 	}
+ 
+ 	private readonly ICppResolveEntity myEntity;
+ 
+ 	private readonly HashMap<ITypeParameter, ICppGenericParameter> myParameterCache;
+ 
++	private readonly CppCxMetadataTypes myNativeTypes; // @MOD C++/CX
++
+ 	public ICppResolvedTypeFactory TypeFactory { get; }
+ 
+ 	public CppGlobalNamespaceResolveEntity GlobalNamespace { get; }
+@@ -135,6 +202,8 @@ public readonly struct CppClrTypeConverter
+ 		TypeFactory = lookupParent.GetVerboseTypeFactory();
+ 		GlobalNamespace = CppGlobalNamespaceResolveEntity.GetInstance(entity);
+ 		myParameterCache = new HashMap<ITypeParameter, ICppGenericParameter>();
++		myNativeTypes = TypeFactory.GetDialect().LanguageKind == CppLanguageKind.CppCx && entity is CppClrClassResolveEntity clazz
++			? CppCxMetadataTypes.Load(clazz.GetTypeElement()) : null; // @MOD C++/CX
+ 	}
+ 
+ 	public CppClrTypeConverter(CppClrTypeConverter cvt, ITypeParametersOwner entity, CppQualifiedNamePart name)
+@@ -143,6 +212,7 @@ public readonly struct CppClrTypeConverter
+ 		myEntity = cvt.myEntity;
+ 		TypeFactory = cvt.TypeFactory;
+ 		GlobalNamespace = cvt.GlobalNamespace;
++		myNativeTypes = cvt.myNativeTypes; // @MOD C++/CX
+ 		if (entity.TypeParameters.Count == 0)
+ 		{
+ 			myParameterCache = cvt.myParameterCache;
+@@ -153,6 +223,437 @@ public readonly struct CppClrTypeConverter
+ 		RegisterGeneric(entity, name);
+ 	}
+ 
++	// BEGIN @MOD C++/CX
++	// Retain raw native signatures before PSI's CLR projection erases generic-owner identity. The loader is scoped to
++	// import, not held by the cache.
++	private sealed class CppCxMetadataTypes
++	{
++		private sealed class NativeTypeCache : IAssemblyDataCache
++		{
++			private readonly ClrNameInternTrie myNames = new ClrNameInternTrie();
++			private readonly DataIntern<ReflectionType> myTypes = new DataIntern<ReflectionType>();
++			private readonly DataIntern<string> myStrings = new DataIntern<string>();
++			private DataIntern<int[]> myAttributeHashes = new DataIntern<int[]>(new ArrayUtil.ArrayEqualityComparer<int>());
++
++			public ReflectionType AddType(ReflectionType type) => myTypes.Intern(type);
++			public AssemblyNameInfo AddAssemblyName(AssemblyNameInfo name) => AssemblyNameInfoFactory.Intern(name);
++			public string AddString(string value) => myStrings.Intern(value);
++			public string AddMemberName(string value) => AddString(value);
++			public ClrNameInternTrie.INode AddNamespaceName(string value) => myNames.Add(value);
++			public ClrNameInternTrie.INode AddTypeName(string ns, string name, IList<int> counts, IMetadataTypeInfo hint) => myNames.Add(ns, name, counts, hint);
++			public int[] AddAttributeHash(int[] hash) => myAttributeHashes?.Intern(hash) ?? hash;
++			public void OnAssemblyLoadingFinished() => myAttributeHashes = null;
++		}
++
++		// Preserve BYREF separately from [In]/[Out] parameter flags.
++		private readonly struct SignatureType
++		{
++			internal readonly ReflectionType Type;
++			internal readonly bool IsByRef;
++			internal readonly bool IsOut;
++
++			internal SignatureType(IMetadataType type, ReflectionTypeBuilder builder, bool isOut = false)
++			{
++				Type = builder.UnwrapFromReferenceTypeAndCreate(type, out IsByRef);
++				IsOut = isOut;
++			}
++		}
++
++		private readonly Dictionary<uint, SignatureType[]> mySignatures = new Dictionary<uint, SignatureType[]>();
++		private HashSet<uint> myFinalMethods;
++		// MethodImpl owners must follow the same native projection as bases.
++		private readonly Dictionary<uint, (ReflectionType Type, string Name)[]> myMethodImplementations = new();
++		private ReflectionType[] myBases;
++		private List<ITypeMember> myAdditionalMembers;
++
++		internal static CppCxMetadataTypes Load(ITypeElement element)
++		{
++			if (element is not CompiledTypeElement compiled || compiled.PsiAssemblyFile is not AssemblyPsiFile file
++				|| element.Module is not IAssemblyPsiModule module)
++			{
++				return null;
++			}
++			IAssemblyLocation location = module.Assembly.Location;
++			VirtualFileSystemPath path = location?.AssemblyPhysicalPath;
++			if (path.IsNullOrEmpty() || !path.Name.EndsWith(".winmd", StringComparison.OrdinalIgnoreCase)
++				|| file.MetadataLoaderFactory == null)
++			{
++				return null;
++			}
++			using MetadataLoader loader = file.MetadataLoaderFactory(location, module);
++			IMetadataAssembly assembly = loader.TryLoadFrom(location, JetFunc<AssemblyNameInfo>.True, loadElementTypes: false);
++			if (assembly == null)
++			{
++				return null;
++			}
++			IMetadataTypeInfo info = assembly.GetTypeInfoFromToken(new MetadataToken(compiled.Token));
++			NativeTypeCache cache = new NativeTypeCache();
++			ReflectionTypeBuilder builder = new ReflectionTypeBuilder(cache);
++			CppCxMetadataTypes result = new CppCxMetadataTypes();
++			HashSet<uint> visibleMembers = null;
++			if (info.IsWindowsRuntime)
++			{
++				visibleMembers = new HashSet<uint>();
++				foreach (ITypeMember member in element.GetMembers())
++				{
++					if (member is ICompiledElement declared)
++					{
++						visibleMembers.Add(declared.Token);
++					}
++				}
++			}
++			bool recoverMembers = false;
++			int baseCount = info.Base == null ? 0 : 1;
++			result.myBases = new ReflectionType[baseCount + info.InterfaceImplementations.Length];
++			if (info.Base != null)
++			{
++				result.myBases[0] = builder.Create(info.Base);
++			}
++			for (int i = 0; i < info.InterfaceImplementations.Length; i++)
++			{
++				result.myBases[baseCount + i] = builder.Create(info.InterfaceImplementations[i].Interface);
++			}
++			foreach (IMetadataMethod method in info.GetMethods())
++			{
++				// PSI normalizes final newslot methods to non-virtual members; retain their native final bit for CX
++				// override eligibility.
++				if (method.IsFinal)
++				{
++					(result.myFinalMethods ??= new HashSet<uint>()).Add(method.Token.Value);
++				}
++				IList<MethodSpecification> implementations = method.ImplementedMethods;
++				if (implementations.Count != 0)
++				{
++					var targets = new (ReflectionType Type, string Name)[implementations.Count];
++					for (int i = 0; i < targets.Length; i++)
++					{
++						targets[i] = (builder.Create(implementations[i].OwnerType), implementations[i].Method.Name);
++					}
++					result.myMethodImplementations[method.Token.Value] = targets;
++				}
++				IMetadataParameter[] parameters = method.Parameters;
++				SignatureType[] signature = new SignatureType[parameters.Length + 1];
++				signature[0] = new SignatureType(method.Signature.ReturnType, builder);
++				for (int i = 0; i < parameters.Length; i++)
++				{
++					signature[i + 1] = new SignatureType(parameters[i].Type, builder, parameters[i].IsOut);
++				}
++				result.mySignatures[method.Token.Value] = signature;
++			}
++			foreach (IMetadataField field in info.GetFields())
++			{
++				result.mySignatures[field.Token.Value] = new[] { new SignatureType(field.Type, builder) };
++			}
++			foreach (IMetadataProperty property in info.GetProperties())
++			{
++				IMetadataParameter[] indices = property.Getter?.Parameters;
++				int count = indices?.Length ?? Math.Max(0, (property.Setter?.Parameters.Length ?? 1) - 1);
++				indices ??= property.Setter?.Parameters;
++				SignatureType[] signature = new SignatureType[count + 1];
++				signature[0] = new SignatureType(property.Type, builder);
++				for (int i = 0; i < count; i++)
++				{
++					signature[i + 1] = new SignatureType(indices[i].Type, builder, indices[i].IsOut);
++				}
++				result.mySignatures[property.Token.Value] = signature;
++			}
++			foreach (IMetadataEvent @event in info.GetEvents())
++			{
++				result.mySignatures[@event.Token.Value] = new[] { new SignatureType(@event.Type, builder) };
++			}
++			if (visibleMembers != null)
++			{
++				foreach (IMetadataMethod method in info.GetMethods())
++				{
++					if (method.Name is not ".ctor" and not ".cctor" && !visibleMembers.Contains(method.Token.Value))
++					{
++						recoverMembers = true;
++						break;
++					}
++				}
++			}
++			if (recoverMembers)
++			{
++				// CLR projection removes implemented collection methods and their properties.
++				// Keep the original PSI declarations; supplement only the missing native tokens.
++				ReflectionElementPropertiesProvider provider = new ReflectionElementPropertiesProvider();
++				using ReflectionBuilder nativeBuilder = new ReflectionBuilder(cache, builder,
++					new ReflectionElementAccessibility(false), provider, true, cache.OnAssemblyLoadingFinished);
++				CompiledTypeElement nativeClass = ReflectionElementPropertiesProvider.GetTypeElementFactory(compiled, nativeBuilder).Create(compiled.Parent, nativeBuilder, info);
++				((ICacheTrieNodeOwner)nativeClass).TrieNode = ((ICacheTrieNodeOwner)compiled).TrieNode;
++				foreach (ITypeMember member in nativeClass.GetMembers())
++				{
++					if (member is ICompiledElement declared && !visibleMembers.Contains(declared.Token))
++					{
++						(result.myAdditionalMembers ??= new List<ITypeMember>()).Add(member);
++					}
++				}
++			}
++			else
++			{
++				cache.OnAssemblyLoadingFinished();
++			}
++			return result;
++		}
++
++		internal IEnumerable<ITypeMember> GetMembers(IEnumerable<ITypeMember> original)
++		{
++			return myAdditionalMembers == null ? original : original.Concat(myAdditionalMembers);
++		}
++
++		internal bool IsFinalMethod(ITypeMember member)
++		{
++			return member is ICompiledElement compiled && myFinalMethods?.Contains(compiled.Token) == true;
++		}
++
++		internal IEnumerable<(IDeclaredType Type, string Name)> DecodeMethodImplementations(ITypeMember member)
++		{
++			if (member is ICompiledElement compiled && myMethodImplementations.TryGetValue(compiled.Token, out var targets))
++			{
++				foreach (var target in targets)
++				{
++					if (DecodeType(target.Type, member) is IDeclaredType type)
++					{
++						yield return (type, target.Name);
++					}
++				}
++			}
++		}
++
++		internal IType Decode(ITypeMember member, int parameter)
++		{
++			if (member is not ICompiledElement compiled
++				|| !mySignatures.TryGetValue(compiled.Token, out SignatureType[] signature)
++				|| parameter + 1 >= signature.Length || signature[parameter + 1].Type is not ReflectionType type)
++			{
++				return null;
++			}
++			return DecodeType(type, member);
++		}
++
++		// An [Out] array without BYREF is a fill-array, not an output handle.
++		internal (bool IsByRef, bool IsOut)? GetParameterFlags(ITypeMember member, int parameter)
++		{
++			if (member is ICompiledElement compiled
++				&& mySignatures.TryGetValue(compiled.Token, out SignatureType[] signature)
++				&& parameter + 1 < signature.Length)
++			{
++				SignatureType type = signature[parameter + 1];
++				return (type.IsByRef, type.IsOut);
++			}
++			return null;
++		}
++
++		internal IEnumerable<IDeclaredType> DecodeBases(ITypeElement owner)
++		{
++			foreach (ReflectionType type in myBases)
++			{
++				if (type != null && DecodeType(type, (ITypeMember)owner) is IDeclaredType declaredType)
++				{
++					yield return declaredType;
++				}
++			}
++		}
++
++		private static IType DecodeType(ReflectionType type, ITypeMember member)
++		{
++			TypeAnnotationsEnumerator<bool> dynamic = TypeAnnotationsEnumerator<bool>.Empty;
++			TypeAnnotationsEnumerator<string> tuple = TypeAnnotationsEnumerator<string>.Empty;
++			TypeAnnotationsEnumerator<NullableAnnotation> nullable = TypeAnnotationsEnumerator<NullableAnnotation>.Empty;
++			TypeAnnotationsEnumerator<bool> native = TypeAnnotationsEnumerator<bool>.Empty;
++			return type.DecodeType(member.Module.GetPsiServices(), member, member.Module, ref dynamic, ref tuple, ref nullable, ref native);
++		}
++	}
++
++	private IType GetNativeSignatureType(ITypeMember member, int parameter = -1)
++	{
++		return myNativeTypes?.Decode(member, parameter);
++	}
++
++	internal bool IsCppCxFinalMethod(ITypeMember member)
++	{
++		return myNativeTypes?.IsFinalMethod(member) == true;
++	}
++
++	// Resolve MethodImpls against native declarations, including accessor
++	// methods whose CLR owner/property cannot be resolved.
++	internal bool TryGetCppCxOverrideTargets(ITypeMember member, ICppDeclaratorResolveEntity declarator, out List<ICppResolveEntity> targets)
++	{
++		targets = null;
++		if (myNativeTypes == null || member is not ICompiledElement)
++		{
++			return false;
++		}
++		List<ICppResolveEntity> result = new();
++		CppQualType signature = CppMethodInheritanceInfo.ComputeSignatureType(declarator.FindGroupedFunction());
++		foreach (var implementation in myNativeTypes.DecodeMethodImplementations(member))
++		{
++			ICppClassResolveEntity owner = ConvertBaseType(implementation.Type).GetResolvedClassTypeEntity();
++			if (owner == null)
++			{
++				continue;
++			}
++			if (member is IAccessor)
++			{
++				foreach (ICppResolveEntity child in owner.GetChildren())
++				{
++					if (child is ICppCxxCliPropertyDeclaratorResolveEntity property)
++					{
++						foreach (ICppResolveEntity accessor in property.GetChildren())
++						{
++							AddCppCxOverrideTargets(accessor, implementation.Name, signature, result);
++						}
++					}
++				}
++			}
++			else if (implementation.Name == "Dispose" && owner.Name.ClassNameAllowsDestructors())
++			{
++				AddCppCxOverrideTargets(owner.GetDestructors(), implementation.Name, signature, result);
++			}
++			else if (implementation.Name == "Finalize" && owner.Name.ClassNameAllowsDestructors())
++			{
++				AddCppCxOverrideTargets(owner.GetCliFinalizers(), implementation.Name, signature, result);
++			}
++			else
++			{
++				foreach (ICppResolveEntity child in owner.ChildByName(new CppQualifiedId(implementation.Name), CppLocationAnchor.BottomMost()))
++				{
++					AddCppCxOverrideTargets(child, implementation.Name, signature, result);
++				}
++			}
++		}
++		targets = result;
++		return true;
++	}
++
++	private static void AddCppCxOverrideTargets(ICppResolveEntity candidate, string metadataName, CppQualType signature, List<ICppResolveEntity> result)
++	{
++		if (candidate is not ICppFunctionDeclaratorResolveEntityPack pack)
++		{
++			return;
++		}
++		foreach (ICppGroupedFunctionDeclaratorResolveEntity function in pack.GetGroupedFunctions())
++		{
++			if (function.FindClrElement()?.ClrDeclaredElement is ITypeMember member && member.ShortName == metadataName
++				&& CppTypesUtil.EqualsIgnoringFunctionReturnTypeAndMagicTypes(signature, CppMethodInheritanceInfo.ComputeSignatureType(function))
++				&& !result.Contains(function))
++			{
++				result.Add(function);
++			}
++		}
++	}
++
++	public CppQualType ConvertMemberType(ITypeOwner member)
++	{
++		return ConvertType(GetNativeSignatureType(member as ITypeMember) ?? member.Type);
++	}
++
++	public IEnumerable<ITypeMember> GetMembers(ITypeElement owner)
++	{
++		IEnumerable<ITypeMember> members = owner.GetMembers();
++		return myNativeTypes?.GetMembers(members) ?? members;
++	}
++
++	public IEnumerable<IDeclaredType> GetSuperTypes(ITypeElement owner)
++	{
++		return myNativeTypes?.DecodeBases(owner) ?? owner.GetSuperTypes();
++	}
++
++
++	// Use the same projection table as the WinMD reader, in the native direction.
++	private static class CppCxProjection
++	{
++		internal static readonly Dictionary<IClrTypeName, IClrTypeName> NativeNames = CreateNativeNames();
++
++		private static Dictionary<IClrTypeName, IClrTypeName> CreateNativeNames()
++		{
++			Dictionary<IClrTypeName, IClrTypeName> result = new Dictionary<IClrTypeName, IClrTypeName>();
++			foreach (var projection in WinMDProjectedTypes.WinMDToClr)
++			{
++				// WindowsNumerics projects the ABI names to platform.winmd's native value types, not to the CLR
++				// System.Numerics definitions.
++				string numericsName = GetNumericsName(projection.Key.Second);
++				IClrTypeName nativeName = new ClrTypeName(numericsName ?? projection.Key.Second);
++				result[new ClrTypeName(projection.Value.Second)] = nativeName;
++				// Native signatures must not resolve back through their CLR projections.
++				result[nativeName] = nativeName;
++				if (numericsName != null)
++				{
++					result[new ClrTypeName(projection.Key.Second)] = nativeName;
++				}
++			}
++			// The ABI's IReference<T> and the CLR's Nullable<T> both name Platform::IBox<T> in native signatures.
++			IClrTypeName boxName = new ClrTypeName("Platform.IBox`1");
++			result[new ClrTypeName("Windows.Foundation.IReference`1")] = boxName;
++			result[new ClrTypeName("System.Nullable`1")] = boxName;
++			result[boxName] = boxName;
++			return result;
++		}
++
++		// WindowsNumerics.impl.h's seven explicit native/WinRT ABI pairs.
++		internal static string GetNumericsName(string name)
++		{
++			return name switch
++			{
++				"Windows.Foundation.Numerics.Vector2" or "Windows.Foundation.Numerics.float2" => "Windows.Foundation.Numerics.float2",
++				"Windows.Foundation.Numerics.Vector3" or "Windows.Foundation.Numerics.float3" => "Windows.Foundation.Numerics.float3",
++				"Windows.Foundation.Numerics.Vector4" or "Windows.Foundation.Numerics.float4" => "Windows.Foundation.Numerics.float4",
++				"Windows.Foundation.Numerics.Matrix3x2" or "Windows.Foundation.Numerics.float3x2" => "Windows.Foundation.Numerics.float3x2",
++				"Windows.Foundation.Numerics.Matrix4x4" or "Windows.Foundation.Numerics.float4x4" => "Windows.Foundation.Numerics.float4x4",
++				"Windows.Foundation.Numerics.Plane" or "Windows.Foundation.Numerics.plane" => "Windows.Foundation.Numerics.plane",
++				"Windows.Foundation.Numerics.Quaternion" or "Windows.Foundation.Numerics.quaternion" => "Windows.Foundation.Numerics.quaternion",
++				_ => null
++			};
++		}
++	}
++
++	private ICppClassResolveEntity LookupCppCxClass(IDeclaredType type)
++	{
++		IClrTypeName name = type.GetClrName();
++		if (CppCxProjection.NativeNames.TryGetValue(name, out IClrTypeName nativeName))
++		{
++			name = nativeName;
++		}
++		else if (type.Resolve().DeclaredElement is ITypeElement)
++		{
++			// Keep the existing nested-class/substitution path for unprojected CLR types.
++			return null;
++		}
++		// C++ namespace import chooses the native definition (including platform.winmd
++		// overrides). A CLR signature can resolve to another assembly or not resolve at all.
++		ICppClassResolveEntity entity = DoLookupClrClass(name, null, default, preferNative: CppCxProjection.GetNumericsName(name.FullName) != null);
++		if (entity == null || name.TypeParametersCount == 0)
++		{
++			return entity;
++		}
++		if (entity.StructuralParent is not CppClassTemplateResolveEntityPack pack)
++		{
++			return null;
++		}
++		// Reflection signatures retain arguments even when the projected CLR assembly
++		// is unavailable. Resolve().Substitution alone loses them in that case.
++		IType[] arguments = (type.WithTypeDecorations(TypeDecorationSet.Empty) as ISimplifiedIdTypeInfo)?.GetTypeArguments();
++		if (arguments == null || arguments.Length != name.TypeParametersCount)
++		{
++			IResolveResult resolved = type.Resolve();
++			if (resolved.DeclaredElement is not ITypeElement element || element.TypeParameters.Count != name.TypeParametersCount)
++			{
++				return null;
++			}
++			arguments = new IType[element.TypeParameters.Count];
++			for (int i = 0; i < arguments.Length; i++)
++			{
++				arguments[i] = resolved.Substitution[element.TypeParameters[i]];
++			}
++		}
++		ICppTemplateArgument[] cppArguments = new ICppTemplateArgument[arguments.Length];
++		for (int i = 0; i < arguments.Length; i++)
++		{
++			cppArguments[i] = CppTypeTemplateArgument.Create(ConvertType(arguments[i]));
++		}
++		return pack.Instantiate(ViewPosForInstantiation(), cppArguments) as ICppClassResolveEntity;
++	}
++
+ 	public ICppClassResolveEntity LookupClrClass(ITypeElement clrclass)
+ 	{
+ 		return LookupClrClass(clrclass, null);
+@@ -182,7 +683,29 @@ public readonly struct CppClrTypeConverter
+ 	public ICppGenericParameter LookupGenericParameter(ITypeParameter param)
+ 	{
+ 		InitParameterCache();
+-		return myParameterCache.GetValueOrDefault(param);
++		if (myParameterCache.TryGetValue(param, out ICppGenericParameter parameter)) // @MOD C++/CX
++		{
++			return parameter;
++		}
++		// @MOD C++/CX: the WinMD reader projects a generic parameter's owner too.
++		// Match its native owner and ordinal, never its display name.
++		if (TypeFactory.GetDialect().LanguageKind == CppLanguageKind.CppCx
++			&& param.Owner is ITypeElement owner
++			&& CppCxProjection.NativeNames.TryGetValue(owner.GetClrName(), out IClrTypeName nativeOwner))
++		{
++			int index = owner.TypeParameters.IndexOf(param);
++			foreach (var entry in myParameterCache)
++			{
++				if (index >= 0 && entry.Key.Owner is ITypeElement candidate
++					&& (CppCxProjection.NativeNames.TryGetValue(candidate.GetClrName(), out IClrTypeName candidateOwner)
++						? candidateOwner : candidate.GetClrName()).Equals(nativeOwner)
++					&& candidate.TypeParameters.IndexOf(entry.Key) == index)
++				{
++					return entry.Value;
++				}
++			}
++		}
++		return null;
+ 	}
+ 
+ 	public CppQualType ConvertType(IType type)
+@@ -196,6 +719,32 @@ public readonly struct CppClrTypeConverter
+ 		return type.Accept(typeVisitor, new TypeConversionContext(nohandle: false, constPtr));
+ 	}
+ 
++	// @MOD C++/CX: WriteOnlyArray<T> is a distinct ref-class template, not an
++	// Array<T> alias. PassArray instead uses const Array<T>^ (const before ^).
++	private CppQualType ConvertCppCxArrayType(IArrayType arrayType, bool nohandle, bool writeOnly = false, bool readOnly = false)
++	{
++		CppNamespaceResolveEntity platform = GlobalNamespace.GetBuiltinsRefs().cx_platform_ns;
++		if (platform == null)
++		{
++			return new CppQualType(CppUnknownType.LookupFailure);
++		}
++		ICppTemplateArgument[] arguments = new ICppTemplateArgument[]
++		{
++			CppTypeTemplateArgument.Create(ConvertType(arrayType.ElementType)),
++			new CppExpressionTemplateArgument(CppIntegralValues.UnsignedInt.Create((uint)arrayType.Rank))
++		};
++		CppQualifiedId name = writeOnly ? CppQualifiedId.WRITE_ONLY_ARRAY_NAME : CppQualifiedId.ARRAY2_NAME;
++		CppSubstitutionId arrayName = new CppSubstitutionId(name, arguments);
++		CppLookupResult lookup = CppLookup.SimpleLookup(new CppViewPos(platform, CppLocationAnchor.BottomMost(), null),
++			CppQualifiedName.Create(arrayName), CppClassTag.NO_TAG);
++		CppQualType result = lookup.LookupResultToQualType(TypeFactory);
++		if (readOnly)
++		{
++			result = result.WithAppendedCVQuals(CVQualifiers.Const);
++		}
++		return nohandle ? result : new CppQualType(TypeFactory.GetCliHandleType(result));
++	}
++
+ 	public CppQualType ConvertFunctionType(IParametersOwner func)
+ 	{
+ 		return ConvertFunctionType(func, constPtr: false);
+@@ -203,10 +752,41 @@ public readonly struct CppClrTypeConverter
+ 
+ 	public CppQualType ConvertFunctionType(IParametersOwner func, bool constPtr)
+ 	{
+-		CppQualType returnType = ConvertType(func.ReturnType);
++		CppQualType returnType = ConvertFunctionReturnType(func); // @MOD C++/CX
+ 		CppEllipsisKind vararg = CppEllipsisKind.None;
+ 		CppQualType[] paramTypes = ConvertFunctionParameters(func, ref vararg, decorate: true, constPtr);
+-		return TypeFactory.GetFunctionType(returnType, paramTypes, new CppFunctionFlags(vararg, CppDecoratedCallingConvention.IMPLICIT_CLRCALL, CppRestrictionSpecifiers.Cpu, FuncRefQualifier.Empty));
++		// @MOD C++/CX: projected members use the native dialect convention, not CLR calling conventions.
++		CppLanguageDialect dialect = TypeFactory.GetDialect();
++		CppDecoratedCallingConvention convention = dialect.LanguageKind == CppLanguageKind.CppCx
++			? new CppDecoratedCallingConvention(false, func is IConstructor ? dialect.DefaultCtorDtorCallingConvention
++				: func is IModifiersOwner { IsStatic: true } ? dialect.DefaultCallingConvention : dialect.DefaultMemberCallingConvention)
++			: CppDecoratedCallingConvention.IMPLICIT_CLRCALL;
++		return TypeFactory.GetFunctionType(returnType, paramTypes, new CppFunctionFlags(vararg, convention, CppRestrictionSpecifiers.Cpu, FuncRefQualifier.Empty));
++	}
++
++	// @MOD C++/CX
++	public CppQualType ConvertFunctionReturnType(IParametersOwner function)
++	{
++		// @MOD C++/CX: expose WinRT's token-returning adder through the CLR projection.
++		if (TypeFactory.GetDialect().LanguageKind == CppLanguageKind.CppCx && function is IAccessor { Kind: AccessorKind.ADDER, OwnerMember: IEvent })
++		{
++			return CppCxxCliPropertyDeclaratorResolveEntityUtil.GetEventRegistrationTokenType(myEntity, TypeFactory);
++		}
++		// Do not evaluate projected PSI types first: native views share the CLR decoded-type cache.
++		IType returnType = GetNativeSignatureType(function as ITypeMember) ?? function.ReturnType; // @MOD C++/CX
++		CppQualType result = ConvertType(returnType);
++		return IsCppCxNativeGuidAlias(function, returnType) ? CppGenerateImplicitMembersUtil.CopyParameterType(result) : result;
++	}
++
++	// @MOD C++/CX
++	internal bool IsCppCxNativeGuidAlias(IParametersOwner function, IType type)
++	{
++		// vccorlib.h uses __rcGUID_t for Guid's native constructor, Equals and conversion.
++		return TypeFactory.GetDialect().LanguageKind == CppLanguageKind.CppCx
++			&& type is IDeclaredType declaredType
++			&& declaredType.GetClrName().FullName == "Platform.Details._GUID"
++			&& function is ITypeMember member
++			&& member.GetContainingType()?.GetClrName().FullName == "Platform.Guid";
+ 	}
+ 
+ 	public CppQualType ConvertBaseType(IDeclaredType type)
+@@ -224,14 +804,44 @@ public readonly struct CppClrTypeConverter
+ 	{
+ 		CppQualType[] array = new CppQualType[func.Parameters.Count];
+ 		int num = 0;
++		bool isCppCx = TypeFactory.GetDialect().LanguageKind == CppLanguageKind.CppCx; // @MOD C++/CX
++		bool isCxEventRemover = isCppCx && func is IAccessor { Kind: AccessorKind.REMOVER, OwnerMember: IEvent }; // @MOD C++/CX
+ 		foreach (IParameter parameter in func.Parameters)
+ 		{
+-			CppQualType cppQualType = ConvertType(parameter.Type, constPtr);
++			IType parameterType = GetNativeSignatureType(func as ITypeMember, num) ?? parameter.Type; // @MOD C++/CX
+ 			ParameterKind kind = parameter.Kind;
+-			if (kind - 3 <= ParameterKind.VALUE)
++			var nativeFlags = myNativeTypes?.GetParameterFlags(func as ITypeMember, num); // @MOD C++/CX
++			bool isByRef = isCppCx && (nativeFlags?.IsByRef
++				?? kind is ParameterKind.REFERENCE or ParameterKind.OUTPUT or ParameterKind.READONLY_REFERENCE); // @MOD C++/CX
++			bool isOut = nativeFlags?.IsOut ?? kind == ParameterKind.OUTPUT; // @MOD C++/CX
++			// @MOD C++/CX: WinRT unsubscription consumes the registration token, never the handler.
++			CppQualType cppQualType = isCxEventRemover
++				? CppCxxCliPropertyDeclaratorResolveEntityUtil.GetEventRegistrationTokenType(myEntity, TypeFactory)
++				: isCppCx && parameterType is IArrayType arrayType
++					? ConvertCppCxArrayType(arrayType, nohandle: false, writeOnly: !isByRef && isOut,
++						readOnly: !isByRef && !isOut)
++					: ConvertType(parameterType, constPtr); // @MOD C++/CX
++			// @MOD C++/CX: project metadata BYREF to a pointer to the converted value
++			// or handle (T*, T^*, Array<T>^*). Metadata [Out] alone is not BYREF.
++			if (isCppCx)
++			{
++				if (isByRef)
++				{
++					if (kind == ParameterKind.READONLY_REFERENCE)
++					{
++						cppQualType = cppQualType.WithAppendedCVQuals(CVQualifiers.Const);
++					}
++					cppQualType = new CppQualType(TypeFactory.GetPointerType(cppQualType));
++				}
++			}
++			else if (kind - 3 <= ParameterKind.VALUE)
+ 			{
+ 				cppQualType = cppQualType.WithChangedRefFlag(ReferenceFlag.CliTracking);
+ 			}
++			if (IsCppCxNativeGuidAlias(func, parameterType)) // @MOD C++/CX
++			{
++				cppQualType = CppGenerateImplicitMembersUtil.CopyParameterType(cppQualType);
++			}
+ 			if (decorate)
+ 			{
+ 				CppQualType namedParameterType = TypeFactory.GetNamedParameterType(CppDecoratedFunctionParameterFactory.CreateResolved(parameter.ShortName, null), cppQualType);
+@@ -333,7 +943,13 @@ public readonly struct CppClrTypeConverter
+ 
+ 	public static CppPredefinedType GetPredefinedType(ITypeElement type, out bool found)
+ 	{
+-		if (type.GetContainingNamespace().QualifiedName != "System")
++		return GetPredefinedType(type.GetClrName(), out found); // @MOD C++/CX
++	}
++
++	// @MOD C++/CX
++	private static CppPredefinedType GetPredefinedType(IClrTypeName type, out bool found)
++	{
++		if (type.GetNamespaceName() != "System")
+ 		{
+ 			found = false;
+ 			return CppPredefinedType.Void;
+@@ -374,9 +990,76 @@ public readonly struct CppClrTypeConverter
+ 		}
+ 	}
+ 
+-	private ICppClassResolveEntity DoLookupClrClass(IClrTypeName clrName, ISubstitution subst, CppSmallList<ITypeElement> parentClrClasses)
++	public static CppPredefinedType GetPredefinedTypeCx(ITypeElement type, CppLanguageDialect dialect, out bool found) // @MOD C++/CX
++	{
++		return GetPredefinedTypeCx(type.GetClrName(), dialect, out found); // @MOD C++/CX
++	}
++
++	// @MOD C++/CX
++	private static CppPredefinedType GetPredefinedTypeCx(IClrTypeName type, CppLanguageDialect dialect, out bool found)
+ 	{
+-		CppLocationAnchor anchor = CppLocationAnchor.GeneratedEntity();
++		string ns = type.GetNamespaceName();
++		string shortName = type.ShortName;
++
++		if (ns == "default")
++		{
++			found = true;
++
++			switch (shortName)
++			{
++				case "char16":
++					return dialect.BuiltinWchar ? CppPredefinedType.WChar : CppPredefinedType.UShort;
++
++				case "float32":
++					return CppPredefinedType.Float;
++
++				case "float64":
++					return CppPredefinedType.Double;
++
++				case "int8":
++					return CppPredefinedType.SChar;
++
++				case "uint8":
++					return CppPredefinedType.UChar;
++
++				case "int16":
++					return CppPredefinedType.Short;
++
++				case "uint16":
++					return CppPredefinedType.UShort;
++
++				case "int32":
++					return CppPredefinedType.Int;
++
++				case "uint32":
++					return CppPredefinedType.UInt;
++
++				case "int64":
++					return CppPredefinedType.LongLong;
++
++				case "uint64":
++					return CppPredefinedType.ULongLong;
++
++				default:
++					found = false;
++					return CppPredefinedType.Void;
++			}
++		}
++
++		if (ns == "Platform" && shortName == "Boolean")
++		{
++			found = true;
++			return CppPredefinedType.Bool;
++		}
++
++		// C++/CX metadata can still contain real System.* types.
++		return GetPredefinedType(type, out found);
++	}
++
++	private ICppClassResolveEntity DoLookupClrClass(IClrTypeName clrName, ISubstitution subst, CppSmallList<ITypeElement> parentClrClasses, bool preferNative = false) // @MOD C++/CX
++	{
++		// @MOD C++/CX: source/header definitions can still be pending or module-backed.
++		CppLocationAnchor anchor = preferNative ? CppLocationAnchor.BottomMost() : CppLocationAnchor.GeneratedEntity();
+ 		ICppScopeResolveEntity cppScopeResolveEntity = DoLookupClrNamespace(clrName);
+ 		if (cppScopeResolveEntity == null)
+ 		{
+@@ -392,7 +1075,11 @@ public readonly struct CppClrTypeConverter
+ 			{
+ 				cppClassResolveEntityWithSubstitution.Instantiate(ViewPosForInstantiation());
+ 			}
+-			CppSmallList<ICppResolveEntity> cppSmallList = ((!(cppScopeResolveEntity is ICppClrScopeResolveEntity cppClrScopeResolveEntity)) ? cppScopeResolveEntity.ChildByName(cppQualifiedId, CppLocationAnchor.GeneratedEntity()) : cppClrScopeResolveEntity.ClrChildByName(cppQualifiedId));
++			// @MOD C++/CX: numerics source definitions, when present, own the same
++			// projected identity; CLR-only lookup cannot see those header declarations.
++			CppSmallList<ICppResolveEntity> cppSmallList = preferNative || cppScopeResolveEntity is not ICppClrScopeResolveEntity
++				? cppScopeResolveEntity.ChildByName(cppQualifiedId, anchor)
++				: ((ICppClrScopeResolveEntity)cppScopeResolveEntity).ClrChildByName(cppQualifiedId);
+ 			ICppClassResolveEntity cppClassResolveEntity = null;
+ 			ICppClassResolveEntity cppClassResolveEntity2 = null;
+ 			foreach (ICppResolveEntity item in cppSmallList)
+@@ -409,10 +1096,14 @@ public readonly struct CppClrTypeConverter
+ 				if (cppClassResolveEntity4 is CppClrClassResolveEntity cppClrClassResolveEntity)
+ 				{
+ 					ITypeElement typeElement2 = cppClrClassResolveEntity.GetTypeElement();
+-					if (typeElement2.TypeParameters.Count == typeName.TypeParametersNumber && typeElement2 == typeElement)
++					if (typeElement2.TypeParameters.Count == typeName.TypeParametersNumber
++						&& (typeElement2 == typeElement || (typeElement == null && TypeFactory.GetDialect().LanguageKind == CppLanguageKind.CppCx))) // @MOD C++/CX
+ 					{
+ 						cppClassResolveEntity = cppClassResolveEntity3;
+-						break;
++						if (!preferNative) // @MOD C++/CX
++						{
++							break;
++						}
+ 					}
+ 				}
+ 				else if ((cppClassResolveEntity4.Name.GetGenericParametersIfTemplateId()?.Count ?? 0) == typeName.TypeParametersNumber)
+@@ -420,7 +1111,7 @@ public readonly struct CppClrTypeConverter
+ 					cppClassResolveEntity2 = cppClassResolveEntity3;
+ 				}
+ 			}
+-			ICppClassResolveEntity cppClassResolveEntity5 = cppClassResolveEntity ?? cppClassResolveEntity2;
++			ICppClassResolveEntity cppClassResolveEntity5 = preferNative ? cppClassResolveEntity2 ?? cppClassResolveEntity : cppClassResolveEntity ?? cppClassResolveEntity2; // @MOD C++/CX
+ 			if (cppClassResolveEntity5 == null)
+ 			{
+ 				return null;

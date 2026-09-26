@@ -1,0 +1,55 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppBuiltinUtil.cs b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppBuiltinUtil.cs
+index 3d83ab86edb9f587e2dc31b4c98e002e3759f9bb..0257d7b77a3727390b925209b43ceb362dcf0bc2 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppBuiltinUtil.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppBuiltinUtil.cs
+@@ -419,6 +419,19 @@ public static class CppBuiltinUtil
+ 						builtinsRefs.cli_system_collections_generic_ienumerable = FindClrClassTemplateChild(ns, CppQualifiedId.IENUMERABLE_NAME);
+ 					}
+ 				}
++				else if (dialect.LanguageKind == CppLanguageKind.CppCx)
++				{
++					builtinsRefs.cx_platform_ns = FindNamespaceChild(globalNs, CppQualifiedId.PLATFORM_NAME);
++					builtinsRefs.cx_platform_string = FindClrClassChild(builtinsRefs.cx_platform_ns, CppQualifiedId.STRING_NAME);
++					builtinsRefs.cx_platform_object = FindClrClassChild(builtinsRefs.cx_platform_ns, CppQualifiedId.OBJECT_NAME);
++					builtinsRefs.cx_platform_valuetype = FindClrClassChild(builtinsRefs.cx_platform_ns, CppQualifiedId.VALUETYPE_NAME);
++					builtinsRefs.cx_platform_idisposable = FindClrClassChild(builtinsRefs.cx_platform_ns, CppQualifiedId.IDISPOSABLE_NAME);
++					builtinsRefs.cx_platform_enum = FindClrClassChild(builtinsRefs.cx_platform_ns, CppQualifiedId.ENUM_NAME);
++					builtinsRefs.cx_platform_type = FindClrClassChild(builtinsRefs.cx_platform_ns, CppQualifiedId.TYPE_NAME);
++					builtinsRefs.cx_platform_delegate = FindClrClassChild(builtinsRefs.cx_platform_ns, CppQualifiedId.DELEGATE_NAME);
++					builtinsRefs.cx_default_ns = FindNamespaceChild(globalNs, CppQualifiedId.DEFAULT_NAME);
++					builtinsRefs.cx_numtypes = FindCxNumericTypes(builtinsRefs.cx_default_ns, builtinsRefs.cx_platform_ns);
++				}
+ 			}
+ 			if (dialect.HasGnuBuiltins)
+ 			{
+@@ -863,6 +876,30 @@ public static class CppBuiltinUtil
+ 		};
+ 	}
+ 
++	private static HashMap<CppNumericTypeKind, ICppClassResolveEntity> FindCxNumericTypes( // @MOD C++/CX
++		CppNamespaceResolveEntity defaultNs, CppNamespaceResolveEntity platformNs)
++	{
++		if (defaultNs == null)
++			return null;
++
++		return new HashMap<CppNumericTypeKind, ICppClassResolveEntity>
++		{
++			{ CppIntTypeKind.BOOL, FindClrClassChild(platformNs, new CppQualifiedId("Boolean")) },
++			{ CppIntTypeKind.SCHAR, FindClrClassChild(defaultNs, new CppQualifiedId("int8")) },
++			{ CppIntTypeKind.UCHAR, FindClrClassChild(defaultNs, new CppQualifiedId("uint8")) },
++			{ CppIntTypeKind.WCHAR_T, FindClrClassChild(defaultNs, new CppQualifiedId("char16")) },
++			{ CppIntTypeKind.CHAR16_T, FindClrClassChild(defaultNs, new CppQualifiedId("char16")) },
++			{ CppIntTypeKind.SHORT, FindClrClassChild(defaultNs, new CppQualifiedId("int16")) },
++			{ CppIntTypeKind.USHORT, FindClrClassChild(defaultNs, new CppQualifiedId("uint16")) },
++			{ CppIntTypeKind.INT, FindClrClassChild(defaultNs, new CppQualifiedId("int32")) },
++			{ CppIntTypeKind.UINT, FindClrClassChild(defaultNs, new CppQualifiedId("uint32")) },
++			{ CppIntTypeKind.LONGLONG, FindClrClassChild(defaultNs, new CppQualifiedId("int64")) },
++			{ CppIntTypeKind.ULONGLONG, FindClrClassChild(defaultNs, new CppQualifiedId("uint64")) },
++			{ CppFloatTypeKind.FLOAT, FindClrClassChild(defaultNs, new CppQualifiedId("float32")) },
++			{ CppFloatTypeKind.DOUBLE, FindClrClassChild(defaultNs, new CppQualifiedId("float64")) }
++		};
++	}
++
+ 	private static CppNamespaceResolveEntity GenerateNamespace(CppGlobalNamespaceResolveEntity globalNs, CppQualifiedId name)
+ 	{
+ 		CppNamespaceResolveEntity cppNamespaceResolveEntity = new CppNamespaceResolveEntity(globalNs, name, CppLocationAnchor.GeneratedEntity(), globalNs.SymbolCache);

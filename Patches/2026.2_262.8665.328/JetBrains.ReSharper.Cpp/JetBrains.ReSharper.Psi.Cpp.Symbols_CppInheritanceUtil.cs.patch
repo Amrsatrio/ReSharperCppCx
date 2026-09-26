@@ -1,0 +1,38 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppInheritanceUtil.cs b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppInheritanceUtil.cs
+index c64a72880951607169892b82b0451996199bdd06..885f27b2db84bda961869816ebef0ae3c9f3b7c1 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppInheritanceUtil.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppInheritanceUtil.cs
+@@ -138,6 +138,24 @@ public static class CppInheritanceUtil
+ 		return ent.PureVirtualSpecifiers.IsFinal();
+ 	}
+ 
++	// @MOD C++/CX: completion enumerates both runtime-class methods and their
++	// interfaces. A sealed implementation must not reappear via its interface slot.
++	public static bool IsCppCxSealedOverrideCandidate(ICppGroupedFunctionDeclaratorResolveEntity candidate, ICppClassResolveEntity derived)
++	{
++		if (derived.GetTypeFactory().GetDialect().LanguageKind != Language.CppLanguageKind.CppCx)
++		{
++			return false;
++		}
++		if (candidate.PureVirtualSpecifiers.IsSealed())
++		{
++			return true;
++		}
++		CppVTableEntryInfoPrimary slot = CppMethodInheritanceInfo.GetCached(candidate)?.PrimaryVirtualSlot;
++		CppClassInheritanceInfo inheritance = CppClassInheritanceInfo.GetCached(derived);
++		return slot != null && inheritance != null && inheritance.VTable.TryGetValue(slot.Slot, out CppVTableEntryInfo implementation)
++			&& (implementation.IsSealed || implementation.Method.IsSealed);
++	}
++
+ 	public static bool IsNew(ICppDeclaratorResolveEntity ent)
+ 	{
+ 		return ent.PureVirtualSpecifiers.IsNew();
+@@ -531,7 +549,7 @@ public static class CppInheritanceUtil
+ 		}
+ 		if (CppClassInheritance.NeedImplicitDisposable(classResolveEntity, in viewPos))
+ 		{
+-			FindBaseClasses(classResolveEntity, CppBaseSpecifiers.PUBLIC | CppBaseSpecifiers.IMPLICIT, new CppQualType(instance.GetBuiltinsRefs().cli_system_idisposable), in viewPos, list, ref hasDependentBase);
++			FindBaseClasses(classResolveEntity, CppBaseSpecifiers.PUBLIC | CppBaseSpecifiers.IMPLICIT, new CppQualType(instance.GetBuiltinsRefs().GetManagedDisposable(symbolCache.TypeFactory.GetDialect().LanguageKind) /*@MOD C++/CX*/), in viewPos, list, ref hasDependentBase);
+ 		}
+ 		return list;
+ 	}

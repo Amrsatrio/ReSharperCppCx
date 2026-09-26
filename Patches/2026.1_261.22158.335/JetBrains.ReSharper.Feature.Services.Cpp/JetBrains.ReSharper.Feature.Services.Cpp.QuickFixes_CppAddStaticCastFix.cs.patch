@@ -1,0 +1,51 @@
+diff --git a/JetBrains.ReSharper.Feature.Services.Cpp.QuickFixes/CppAddStaticCastFix.cs b/JetBrains.ReSharper.Feature.Services.Cpp.QuickFixes/CppAddStaticCastFix.cs
+index 8f6b2a1dd66ad7eab893d62b875519a02702046f..3db11c1e4a96f9596fb1dab4eef2a6acad2bcb2d 100644
+--- a/JetBrains.ReSharper.Feature.Services.Cpp.QuickFixes/CppAddStaticCastFix.cs
++++ b/JetBrains.ReSharper.Feature.Services.Cpp.QuickFixes/CppAddStaticCastFix.cs
+@@ -37,6 +37,8 @@ public class CppAddStaticCastFix : CppQuickFixBase
+ 	{
+ 		private readonly string myFormat;
+ 
++		internal string Format => myFormat;
++
+ 		private readonly ICppExpressionNode myExpression;
+ 
+ 		public string Text { get; }
+@@ -193,6 +195,37 @@ public class CppAddStaticCastFix : CppQuickFixBase
+ 
+ 	public override IEnumerable<IntentionAction> CreateBulbItems()
+ 	{
++		return FilterCxHandleCastSuggestions(CreateBulbItemsCore());
++	}
++
++	private IEnumerable<IntentionAction> FilterCxHandleCastSuggestions(IEnumerable<IntentionAction> source)
++	{
++		string[] suggestions = CppTreeModificationUtil.GetCxHandleCastSuggestions(myExpression, myQualType);
++		if (suggestions == null)
++		{
++			return source;
++		}
++		List<IntentionAction> result = new List<IntentionAction>(source);
++		for (int index = result.Count - 1; index >= 0; index--)
++		{
++			if (result[index].BulbAction is CppCastFix cppCastFix &&
++				(cppCastFix.Format.StartsWith("static_cast<", StringComparison.Ordinal) ||
++				 cppCastFix.Format.StartsWith("dynamic_cast<", StringComparison.Ordinal)))
++			{
++				result.RemoveAt(index);
++			}
++		}
++		foreach (string suggestion in suggestions)
++		{
++			string text = LocalizedStringExtensions.Format(Strings.Apply_To__Text, "'" + suggestion + "'", myExpressionToConvertKind);
++			result.Add(new CppCastFix(text, suggestion + "($0)", myExpression)
++				.ToQuickFixIntention(CppQuickFixAnchors.Default));
++		}
++		return result;
++	}
++
++	private IEnumerable<IntentionAction> CreateBulbItemsCore()
++	{
+ 		if (myExpression == null)
+ 		{
+ 			yield break;

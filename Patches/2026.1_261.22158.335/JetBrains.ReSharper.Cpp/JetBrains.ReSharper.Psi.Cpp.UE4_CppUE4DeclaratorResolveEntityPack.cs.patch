@@ -1,0 +1,13 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.UE4/CppUE4DeclaratorResolveEntityPack.cs b/JetBrains.ReSharper.Psi.Cpp.UE4/CppUE4DeclaratorResolveEntityPack.cs
+index 07590f9cf048615235c4efe36871f5a2ee286d12..06b193a41f3604c601c0a12d251cb82d9bee3d47 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.UE4/CppUE4DeclaratorResolveEntityPack.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.UE4/CppUE4DeclaratorResolveEntityPack.cs
+@@ -306,7 +306,7 @@ public class CppUE4DeclaratorResolveEntityPack : CppDeclaratorResolveEntityPack
+ 				t = t.WithAppendedCVQuals(CVQualifiers.Const);
+ 			}
+ 			CppPointerType pointerType = tf.GetPointerType(t);
+-			CppQualType[] parameterTypes = ArrayUtil.Add<CppQualType>(array: cppType.GetFunctionParameterTypes(), element: new CppQualType(pointerType));
++			CppQualType[] parameterTypes = ArrayUtil.Add<CppQualType>(cppType.GetFunctionParameterTypes(), new CppQualType(pointerType)); // @MOD Fix compile: removed generated param names
+ 			cppType = cppType.ReplaceFunctionParameterTypes(parameterTypes, tf);
+ 			CppGeneratedFunctionDeclaratorResolveEntity declEnt = new CppGeneratedFunctionDeclaratorResolveEntity(CppGeneratedResolveEntityType.UE4_GENERATED_MEMBER, cppType, cent, base.Name, cent.GetEndLocationAnchor(), CppDeclarationSpecifiers.Static);
+ 			GetBuilder().AddDeclaratorEntity(declEnt);

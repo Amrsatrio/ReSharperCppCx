@@ -1,0 +1,32 @@
+diff --git a/JetBrains.ReSharper.Feature.Services.Cpp.Bind/CppTransformLinkageToResolveEntityType.cs b/JetBrains.ReSharper.Feature.Services.Cpp.Bind/CppTransformLinkageToResolveEntityType.cs
+index a5d2ba89e099961093e3ff90ee6f18e87d70af40..f904d7c3d608aff1d30c687a8f42d3d54f4c957f 100644
+--- a/JetBrains.ReSharper.Feature.Services.Cpp.Bind/CppTransformLinkageToResolveEntityType.cs
++++ b/JetBrains.ReSharper.Feature.Services.Cpp.Bind/CppTransformLinkageToResolveEntityType.cs
+@@ -48,22 +48,12 @@ public class CppTransformLinkageToResolveEntityType : CppIdentityTypeVisitorWith
+ 		public ICppResolveEntity Visit(CppPackIndexLinkageEntity ent)
+ 		{
+ 			ICppAnyLinkageEntityOrTemplateParameter pack = ent.Pack;
+-			ICppResolveEntity cppResolveEntity = default(ICppResolveEntity);
+-			if (!(pack is ICppLinkageTemplateParameter linkageParam))
++			// @MOD Fix compile
++			ICppResolveEntity cppResolveEntity = pack switch
+ 			{
+-				if (pack is ICppLinkageEntity linkageEnt)
+-				{
+-					cppResolveEntity = myTypeVisitor.GetByLinkageEnt(linkageEnt);
+-				}
+-				else
+-				{
+-					global::_003CPrivateImplementationDetails_003E.ThrowInvalidOperationException();
+-				}
+-			}
+-			else
+-			{
+-				cppResolveEntity = myTypeVisitor.GetByLinkageParameter(linkageParam);
+-			}
++				ICppLinkageTemplateParameter linkageParam => myTypeVisitor.GetByLinkageParameter(linkageParam),
++				ICppLinkageEntity linkageEnt => myTypeVisitor.GetByLinkageEnt(linkageEnt),
++			};
+ 			ICppResolveEntity pack2 = cppResolveEntity;
+ 			ICppResolvedExpression index = myTypeVisitor.TransformExpression(ent.Index);
+ 			return new CppPackIndexResolveEntity(pack2, index);

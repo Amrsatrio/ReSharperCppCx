@@ -1,0 +1,42 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClassSymbolUtil.cs b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClassSymbolUtil.cs
+index 46e4a163d1f8a53a38e0015134fccfb0425b6572..5a516cc04fad9069b4a13529f69526d9ad9bddf7 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClassSymbolUtil.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClassSymbolUtil.cs
+@@ -6,6 +6,37 @@ namespace JetBrains.ReSharper.Psi.Cpp.Symbols;
+ 
+ public static class CppClassSymbolUtil
+ {
++	// @MOD C++/CX: a composed module class with a final definition is not a partial fragment.
++	public static bool IsCxPartial(ICppClassOrDelegateSymbolOrModuleEntity symbol)
++	{
++		if (symbol is CppClassSymbol source)
++		{
++			return source.IsCxPartial;
++		}
++		if (symbol is CppDeserializedFromModuleClassSymbol deserialized)
++		{
++			return deserialized.IsCxPartial;
++		}
++		if (symbol is CppClassModuleEntity module && module.SymbolParts != null)
++		{
++			bool hasPartialDefinition = false;
++			foreach (ICppClassOrDelegateSymbol part in module.SymbolParts)
++			{
++				if (!part.IsDefinition())
++				{
++					continue;
++				}
++				if (!IsCxPartial(part))
++				{
++					return false;
++				}
++				hasPartialDefinition = true;
++			}
++			return hasPartialDefinition;
++		}
++		return false;
++	}
++
+ 	private class ClassBodyAllowsLateMergingVisitor : CppAbstractTypeVisitor<bool>
+ 	{
+ 		private readonly ICppLazyMergingDataConsumer myResultConsumer;

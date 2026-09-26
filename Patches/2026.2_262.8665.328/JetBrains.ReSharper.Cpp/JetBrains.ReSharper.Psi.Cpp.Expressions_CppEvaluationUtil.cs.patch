@@ -1,0 +1,36 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Expressions/CppEvaluationUtil.cs b/JetBrains.ReSharper.Psi.Cpp.Expressions/CppEvaluationUtil.cs
+index fba6f9c475d7ece4ca9ab8d71fea01226c26cfff..012c8ffff1baf03f20ab32f15f63c969a212622d 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Expressions/CppEvaluationUtil.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Expressions/CppEvaluationUtil.cs
+@@ -216,7 +216,9 @@ public static class CppEvaluationUtil
+ 							return error;
+ 						}
+ 						cppValue3 = cppObjectValue2;
+-						goto IL_0240;
++						cppObjectValue.SetField(cppGroupedVariableDeclaratorResolveEntity, cppValue3); // @MOD Degoto'd to fix compile
++						cppValue = cppValue3;
++						continue;
+ 					}
+ 					CppArrayType cppArrayType = cppType.InternalAs<CppArrayType>();
+ 					if (cppArrayType != null)
+@@ -249,7 +251,9 @@ public static class CppEvaluationUtil
+ 								}
+ 							}
+ 							cppValue3 = CreateArray(num2 + 1, valueOrDefault, cppArrayType.InnerType);
+-							goto IL_0240;
++							cppObjectValue.SetField(cppGroupedVariableDeclaratorResolveEntity, cppValue3); // @MOD Degoto'd to fix compile
++							cppValue = cppValue3;
++							continue;
+ 						}
+ 					}
+ 					return evaluator.InternalFail();
+@@ -265,9 +269,6 @@ public static class CppEvaluationUtil
+ 				return error2;
+ 			}
+ 			continue;
+-			IL_0240:
+-			cppObjectValue.SetField(cppGroupedVariableDeclaratorResolveEntity, cppValue3);
+-			cppValue = cppValue3;
+ 		}
+ 		ICppEvaluationResult cppEvaluationResult3 = item.ImplicitConversionSequence.FromExpression.EvaluateAndConvert(item.TargetType, evaluator);
+ 		evaluator.UnregisterTemporary(cppEvaluationResult3);

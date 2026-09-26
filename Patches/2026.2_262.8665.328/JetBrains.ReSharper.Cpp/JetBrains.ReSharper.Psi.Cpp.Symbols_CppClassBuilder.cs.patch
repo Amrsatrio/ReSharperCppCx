@@ -1,0 +1,72 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClassBuilder.cs b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClassBuilder.cs
+index c391b15b0d0b0cace241d7e9e10b285ef4883826..9032b49cf9ac4905753f5f4f1190fc59b226599d 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClassBuilder.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClassBuilder.cs
+@@ -56,6 +56,8 @@ public sealed class CppClassBuilder
+ 
+ 	private CppClassKey myKey;
+ 
++	private bool myIsCxPartial; // @MOD C++/CX
++
+ 	private CppAttributeList myUnresolvedAttributes;
+ 
+ 	private CppAttributeList myReplacedAttributes;
+@@ -96,7 +98,10 @@ public sealed class CppClassBuilder
+ 		{
+ 			CppLocationAnchor cppLocationAnchor = myDeclBuilder.GetOwnerByBuilder().ResolveCache.IncrementCurrentAnchor();
+ 			myDeclBuilder.GetOwnerByBuilder().RegisterClassEnd(myRBraceLocation.ComplexOffset, cppLocationAnchor);
+-			myResolveEnt.SetEndLocationAnchor(cppLocationAnchor);
++			if (!CppClassSymbolUtil.IsCxPartial(myClassSym)) // @MOD C++/CX: retain source anchors without completing the class.
++			{
++				myResolveEnt.SetEndLocationAnchor(cppLocationAnchor);
++			}
+ 		}
+ 		if (myClassSym is ICppSymbolWithBracedBody cppSymbolWithBracedBody)
+ 		{
+@@ -130,6 +135,7 @@ public sealed class CppClassBuilder
+ 	public void LearnKey(ref CppClassKeyBuilder keyBuilder)
+ 	{
+ 		myKey = keyBuilder.GetClassKey();
++		myIsCxPartial = keyBuilder.IsCxPartial; // @MOD C++/CX
+ 	}
+ 
+ 	public static ICppAttributeListBuilder CreateAttributesBuilder(bool detectionMode)
+@@ -200,10 +206,11 @@ public sealed class CppClassBuilder
+ 		{
+ 			ownerByBuilder.RegisterAndIncrementAnchor(myLocation.ComplexOffset);
+ 			CppClassSymbol symbol = (CppClassSymbol)(myClassSym = (ICppClassSymbol)(myScopeSym = new CppClassSymbol(myUnresolvedName, CppTemplateDeclarationBuilderUtil.GetSymbolsParamList(myDeclBuilder.TemplateDeclarationBuilder()), myUnresolvedAttributes, myLocation, myKey, currentAccessibility, myClassVirtualSpecifiers, flag, flag2, moduleAttachment)));
++			symbol.IsCxPartial = myIsCxPartial; // @MOD C++/CX: a base clause creates a definition symbol before the opening brace is reached.
+ 			myClassSymAnchor = currentAnchor;
+ 			AddClassChildToBuilder(myDeclBuilder, myScopeSym);
+ 			myResolveEnt = CppClassBuilderUtil.CreateClassResolveEntity(resolveEntity, symbol, myReplacedName, currentAnchor, CppTemplateDeclarationBuilderUtil.GetResolveEntitiesParamList(myDeclBuilder.TemplateDeclarationBuilder()), flag, myReplacedAttributes, text, ref myFoundImported);
+-			if (!myFoundImported)
++			if (!myFoundImported && !symbol.IsCxPartial) // @MOD C++/CX
+ 			{
+ 				myResolveEnt.SetDefinitionLocationAnchor(currentAnchor);
+ 			}
+@@ -282,9 +289,15 @@ public sealed class CppClassBuilder
+ 	{
+ 		myHasBody = hasBody;
+ 		CppComplexOffset complexOffset = myLocation.ComplexOffset;
+-		if (myClassType == CppBuiltClassType.REGULAR)
++		if (myClassType == CppBuiltClassType.REGULAR && !CppClassSymbolUtil.IsCxPartial(myClassSym)) // @MOD C++/CX
+ 		{
+ 			myResolveEnt.SetBases(myEntityBases);
++			// @MOD C++/CX: replay partial bodies only when the final definition is available.
++			if (myResolveEnt is CppClassData classData)
++			{
++				classData.PrepareCxPartialDefinition();
++				myDeclBuilder.GetOwnerByBuilder().RefreshCxPartialMemberMappings(classData); // @MOD C++/CX
++			}
+ 			myResolveEnt.ResolveBases();
+ 		}
+ 		else if (myClassType == CppBuiltClassType.OPAQUE_ENUM)
+@@ -395,7 +408,7 @@ public sealed class CppClassBuilder
+ 	/// \pre must be called once
+ 	public void SetUsedAsType()
+ 	{
+-		if (GetBuiltType() == CppBuiltClassType.REGULAR)
++		if (GetBuiltType() == CppBuiltClassType.REGULAR && !CppClassSymbolUtil.IsCxPartial(myClassSym)) // @MOD C++/CX
+ 		{
+ 			CppGenerateImplicitMembersUtil.GenerateImplicitlyGeneratedMembers(myResolveEnt, myResolveEnt.GetFileResolveCache());
+ 			myResolveEnt.GenerateImplicitDisposableIfNeeded();

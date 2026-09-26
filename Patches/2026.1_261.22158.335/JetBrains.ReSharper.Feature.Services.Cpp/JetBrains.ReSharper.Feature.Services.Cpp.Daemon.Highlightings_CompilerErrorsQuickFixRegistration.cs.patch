@@ -1,0 +1,20 @@
+diff --git a/JetBrains.ReSharper.Feature.Services.Cpp.Daemon.Highlightings/CompilerErrorsQuickFixRegistration.cs b/JetBrains.ReSharper.Feature.Services.Cpp.Daemon.Highlightings/CompilerErrorsQuickFixRegistration.cs
+index fd8c44d62f949e4b38fb5db56bb1aeb04f87194d..895237e84f45ed14f8b90a1e6a095ebe0634d3fb 100644
+--- a/JetBrains.ReSharper.Feature.Services.Cpp.Daemon.Highlightings/CompilerErrorsQuickFixRegistration.cs
++++ b/JetBrains.ReSharper.Feature.Services.Cpp.Daemon.Highlightings/CompilerErrorsQuickFixRegistration.cs
+@@ -3,6 +3,7 @@ using System.Collections.Generic;
+ using JetBrains.Application;
+ using JetBrains.Application.Parts;
+ using JetBrains.Lifetimes;
++using JetBrains.ReSharper.Feature.Services.Cpp.Daemon;
+ using JetBrains.ReSharper.Feature.Services.Cpp.QuickFixes;
+ using JetBrains.ReSharper.Feature.Services.Cpp.QuickFixes.ChangeType;
+ using JetBrains.ReSharper.Feature.Services.Cpp.QuickFixes.CorrectSignature;
+@@ -221,5 +222,7 @@ public class CompilerErrorsQuickFixRegistration : IQuickFixesProvider
+ 		table.RegisterQuickFix(Lifetime.Eternal, (TemplateParameterShadowingWarning h) => new CppRenameRefactoringFix(h), typeof(CppRenameRefactoringFix));
+ 		table.RegisterQuickFix(Lifetime.Eternal, (MutableSpecifierOnReferenceMemberWarning h) => new CppDeleteDeclarationSpecifierFix(h), typeof(CppDeleteDeclarationSpecifierFix));
+ 		table.RegisterQuickFix(Lifetime.Eternal, (UninitializedDependentBaseClassWarning h) => new CppInitializeMemberOrBaseFix(h), typeof(CppInitializeMemberOrBaseFix));
++		table.RegisterQuickFix(Lifetime.Eternal, (CppCxRefPointerError h) => new CppCxReplaceRefPointerFix(h), typeof(CppCxReplaceRefPointerFix));
++		table.RegisterQuickFix(Lifetime.Eternal, (CannotCastError h) => new CppCxAddCheckedCastHandleFix(h), typeof(CppCxAddCheckedCastHandleFix));
+ 	}
+ }

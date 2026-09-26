@@ -1,0 +1,17 @@
+diff --git a/JetBrains.ReSharper.Feature.Services.Cpp.Daemon/CppAbstractDeclaratorErrorsAnalyzer.cs b/JetBrains.ReSharper.Feature.Services.Cpp.Daemon/CppAbstractDeclaratorErrorsAnalyzer.cs
+index 9be41af9dc3bdec80de0e2dbc0d4992172e0656c..e5d00b79400252591c48462f19dc9d0674c4fc14 100644
+--- a/JetBrains.ReSharper.Feature.Services.Cpp.Daemon/CppAbstractDeclaratorErrorsAnalyzer.cs
++++ b/JetBrains.ReSharper.Feature.Services.Cpp.Daemon/CppAbstractDeclaratorErrorsAnalyzer.cs
+@@ -7,7 +7,11 @@ using JetBrains.ReSharper.Psi.Tree;
+ 
+ namespace JetBrains.ReSharper.Feature.Services.Cpp.Daemon;
+ 
+-[ElementProblemAnalyzer(Instantiation.DemandAnyThreadSafe, new Type[] { typeof(TypeId) }, HighlightingTypes = new Type[] { typeof(CppDeclaratorErrorsBaseAnalyzer) })]
++[ElementProblemAnalyzer(Instantiation.DemandAnyThreadSafe, new Type[] { typeof(TypeId) }, HighlightingTypes = new Type[]
++{
++	typeof(CppDeclaratorErrorsBaseAnalyzer),
++	typeof(CppCxRefPointerError)
++})]
+ public class CppAbstractDeclaratorErrorsAnalyzer : IElementProblemAnalyzer
+ {
+ 	public virtual void Run(ITreeNode node, ElementProblemAnalyzerData data, IHighlightingConsumer consumer)

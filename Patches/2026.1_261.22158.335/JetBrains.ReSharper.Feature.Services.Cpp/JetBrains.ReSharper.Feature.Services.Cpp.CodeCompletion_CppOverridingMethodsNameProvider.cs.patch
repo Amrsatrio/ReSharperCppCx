@@ -1,0 +1,31 @@
+diff --git a/JetBrains.ReSharper.Feature.Services.Cpp.CodeCompletion/CppOverridingMethodsNameProvider.cs b/JetBrains.ReSharper.Feature.Services.Cpp.CodeCompletion/CppOverridingMethodsNameProvider.cs
+index 9dc20f82b289a3707727cad7911133b16ae75b36..1a9e8c96d24b1642587dc98ea12b529a4245b3dc 100644
+--- a/JetBrains.ReSharper.Feature.Services.Cpp.CodeCompletion/CppOverridingMethodsNameProvider.cs
++++ b/JetBrains.ReSharper.Feature.Services.Cpp.CodeCompletion/CppOverridingMethodsNameProvider.cs
+@@ -104,7 +104,7 @@ public class CppOverridingMethodsNameProvider : ItemsProviderOfSpecificContext<C
+ 		{
+ 			if (!item.GetKey().IsCliInterface() || flag)
+ 			{
+-				CollectVirtualFunctions(item, hashSet2);
++				CollectVirtualFunctions(item, hashSet2, classResolveEntity);
+ 			}
+ 		}
+ 		if (hashSet2.IsEmpty())
+@@ -148,7 +148,7 @@ public class CppOverridingMethodsNameProvider : ItemsProviderOfSpecificContext<C
+ 		return false;
+ 	}
+ 
+-	private static void CollectVirtualFunctions(ICppClassResolveEntity clazz, HashSet<CppOverridingMethodsProviderBase.MethodSignature> result)
++	private static void CollectVirtualFunctions(ICppClassResolveEntity clazz, HashSet<CppOverridingMethodsProviderBase.MethodSignature> result, ICppClassResolveEntity derived)
+ 	{
+ 		foreach (ICppResolveEntity child in clazz.GetChildren())
+ 		{
+@@ -158,7 +158,7 @@ public class CppOverridingMethodsNameProvider : ItemsProviderOfSpecificContext<C
+ 			}
+ 			foreach (CppGroupedFunctionDeclaratorResolveEntity groupedFunction in cppDeclaratorResolveEntityPack.GetGroupedFunctions())
+ 			{
+-				if (groupedFunction.Name.IsQualifiedId() && groupedFunction.DeclarationSpecifiers.IsVirtual() && !CppOverridingMethodsProviderBase.IsOverrideOrFinal(groupedFunction))
++				if (groupedFunction.Name.IsQualifiedId() && groupedFunction.DeclarationSpecifiers.IsVirtual() && !CppOverridingMethodsProviderBase.IsOverrideOrFinalForCx(groupedFunction, derived))
+ 				{
+ 					CppQualType verboseType = groupedFunction.GetVerboseType();
+ 					result.Add(new CppOverridingMethodsProviderBase.MethodSignature(groupedFunction, verboseType));

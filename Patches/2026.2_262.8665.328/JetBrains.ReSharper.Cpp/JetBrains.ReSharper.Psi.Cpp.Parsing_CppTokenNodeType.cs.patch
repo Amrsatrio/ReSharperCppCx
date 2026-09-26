@@ -1,0 +1,13 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Parsing/CppTokenNodeType.cs b/JetBrains.ReSharper.Psi.Cpp.Parsing/CppTokenNodeType.cs
+index fbed00e50580c7f83288d9e3726c99424966d976..4f096eac7f35e4f1b470dd32ef2ad3d73ac64f88 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Parsing/CppTokenNodeType.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Parsing/CppTokenNodeType.cs
+@@ -7,7 +7,7 @@ namespace JetBrains.ReSharper.Psi.Cpp.Parsing;
+ 
+ public abstract class CppTokenNodeType : TokenNodeType
+ {
+-	private static readonly CppTokenNodeType[] ourTokenByIndex = new CppTokenNodeType[620];
++	private static readonly CppTokenNodeType[] ourTokenByIndex = new CppTokenNodeType[(int)CppTokenKind._NUMBER_OF_ELEMENTS_]; // @MOD C++/CX
+ 
+ 	public override bool IsWhitespace
+ 	{

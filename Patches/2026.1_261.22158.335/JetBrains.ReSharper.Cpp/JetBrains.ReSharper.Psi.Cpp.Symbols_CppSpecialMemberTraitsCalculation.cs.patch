@@ -1,0 +1,46 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppSpecialMemberTraitsCalculation.cs b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppSpecialMemberTraitsCalculation.cs
+index 41814397db15599157bb5b91827b7eb6fdb2cc3c..f754006d9d28cc1637de67171bfd0edf64d4469f 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppSpecialMemberTraitsCalculation.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppSpecialMemberTraitsCalculation.cs
+@@ -100,6 +100,19 @@ public static class CppSpecialMemberTraitsCalculation
+ 	{
+ 		private TraitsImpl myImpl = new TraitsImpl(TraitsImpl.Tag);
+ 
++		// @MOD C++/CX: ValueType is a runtime identity base, not an assignable
++		// native subobject. Still inspect the value's fields and any other bases.
++		public bool ApplyManagedValueBase(ICppClassResolveEntity @base, in CppTypeContext tc)
++		{
++			if (tc.Factory.GetDialect().LanguageKind == Language.CppLanguageKind.CppCx
++				&& clazz.GetKey().IsCliValueClass() && @base.IsSystemValueType())
++			{
++				myImpl.IsTrivial = false;
++				return true;
++			}
++			return false;
++		}
++
+ 		public bool ApplyBaseTraits(CppFunctionTraits baseTraits, CppBaseSpecifiers specifiers)
+ 		{
+ 			return myImpl.ApplyBaseTraits(baseTraits, specifiers);
+@@ -788,7 +801,9 @@ public static class CppSpecialMemberTraitsCalculation
+ 		AssignmentTraits assignmentTraits = new AssignmentTraits(clazz);
+ 		foreach (CppBasicBaseDescription<ICppClassResolveEntity> nonDependentBasis in clazz.GetNonDependentBases())
+ 		{
+-			if (assignmentTraits.ApplyBaseTraits(CopyAssignmentTraits(clazz, nonDependentBasis.Entity(), in tc), nonDependentBasis.Specifiers()))
++			ICppClassResolveEntity baseClass = nonDependentBasis.Entity(); // @MOD C++/CX
++			if (!assignmentTraits.ApplyManagedValueBase(baseClass, in tc)
++				&& assignmentTraits.ApplyBaseTraits(CopyAssignmentTraits(clazz, baseClass, in tc), nonDependentBasis.Specifiers()))
+ 			{
+ 				return CppFunctionTraits.DELETED;
+ 			}
+@@ -842,7 +857,9 @@ public static class CppSpecialMemberTraitsCalculation
+ 		AssignmentTraits assignmentTraits = new AssignmentTraits(clazz);
+ 		foreach (CppBasicBaseDescription<ICppClassResolveEntity> nonDependentBasis in clazz.GetNonDependentBases())
+ 		{
+-			if (assignmentTraits.ApplyBaseTraits(MoveAssignmentTraits(clazz, nonDependentBasis.Entity(), in tc), nonDependentBasis.Specifiers()))
++			ICppClassResolveEntity baseClass = nonDependentBasis.Entity(); // @MOD C++/CX
++			if (!assignmentTraits.ApplyManagedValueBase(baseClass, in tc)
++				&& assignmentTraits.ApplyBaseTraits(MoveAssignmentTraits(clazz, baseClass, in tc), nonDependentBasis.Specifiers()))
+ 			{
+ 				return CppFunctionTraits.DELETED;
+ 			}

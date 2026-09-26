@@ -1,0 +1,14 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Caches/CppGlobalSymbolCache.cs b/JetBrains.ReSharper.Psi.Cpp.Caches/CppGlobalSymbolCache.cs
+index 36c99f51bf3db10ec52026e80d5ed6e0d3cc1b3a..1011763ec7a5d7fc350e49cc3d01af5a9359bd60 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Caches/CppGlobalSymbolCache.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Caches/CppGlobalSymbolCache.cs
+@@ -54,6 +54,9 @@ namespace JetBrains.ReSharper.Psi.Cpp.Caches;
+ [PsiComponent(Instantiation.DemandAnyThreadUnsafe)]
+ public sealed class CppGlobalSymbolCache : IStartupActivity
+ {
++	public const int CACHE_FORMAT_VERSION_ORIGINAL = CACHE_FORMAT_VERSION; // @MOD C++/CX
++	public const int CACHE_FORMAT_VERSION_CX = CACHE_FORMAT_VERSION_ORIGINAL + 1; // @MOD C++/CX
++
+ 	public delegate void FileSymbolsRemoved(ICollection<CppFileLocation> files);
+ 
+ 	private class SourceFileState(LongSet symbolTables, int compilationPropertiesHashCode, int includePathsHashCode)

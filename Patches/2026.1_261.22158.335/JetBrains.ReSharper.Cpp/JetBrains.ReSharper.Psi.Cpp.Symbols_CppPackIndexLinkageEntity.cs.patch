@@ -1,0 +1,27 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppPackIndexLinkageEntity.cs b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppPackIndexLinkageEntity.cs
+index 62743f9f72a415ea253a7039f7c6caaec9f22a69..f62006d40c57fe54380a9a0fb4ead03ea02df90c 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppPackIndexLinkageEntity.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppPackIndexLinkageEntity.cs
+@@ -19,18 +19,11 @@ public sealed class CppPackIndexLinkageEntity(ICppAnyLinkageEntityOrTemplatePara
+ 
+ 	private CppQualifiedNamePart GetPackName()
+ 	{
+-		ICppAnyLinkageEntityOrTemplateParameter cppAnyLinkageEntityOrTemplateParameter = pack;
+-		if (!(cppAnyLinkageEntityOrTemplateParameter is ICppLinkageTemplateParameter { Name: var name }))
++		return pack switch // @MOD Fix compile
+ 		{
+-			if (cppAnyLinkageEntityOrTemplateParameter is ICppLinkageEntity { Name: var name2 })
+-			{
+-				return name2;
+-			}
+-			global::_003CPrivateImplementationDetails_003E.ThrowInvalidOperationException();
+-			CppQualifiedNamePart result = default(CppQualifiedNamePart);
+-			return result;
+-		}
+-		return name;
++			ICppLinkageTemplateParameter { Name: var name } => name,
++			ICppLinkageEntity { Name: var name2 } => name2
++		};
+ 	}
+ 
+ 	public Result Accept<Result>(ICppDependentLinkageEntityVisitor<Result> visitor)

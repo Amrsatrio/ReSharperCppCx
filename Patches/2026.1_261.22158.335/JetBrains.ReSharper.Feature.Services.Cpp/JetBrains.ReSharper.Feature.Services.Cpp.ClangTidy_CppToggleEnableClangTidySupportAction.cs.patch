@@ -1,0 +1,16 @@
+diff --git a/JetBrains.ReSharper.Feature.Services.Cpp.ClangTidy/CppToggleEnableClangTidySupportAction.cs b/JetBrains.ReSharper.Feature.Services.Cpp.ClangTidy/CppToggleEnableClangTidySupportAction.cs
+index 10b0b21832b11ab10a28b2a215a774ddaa98b8e3..edcc40fe9676c292ecf2b5bb946762138b480f78 100644
+--- a/JetBrains.ReSharper.Feature.Services.Cpp.ClangTidy/CppToggleEnableClangTidySupportAction.cs
++++ b/JetBrains.ReSharper.Feature.Services.Cpp.ClangTidy/CppToggleEnableClangTidySupportAction.cs
+@@ -18,9 +18,9 @@ namespace JetBrains.ReSharper.Feature.Services.Cpp.ClangTidy;
+ public class CppToggleEnableClangTidySupportAction : ToggleBooleanSettingActionBase<CppClangTidySettings>, IInsertAfter<CodeAnalysisSettingsActionBar, ToggleShowCppImportPopupAction>
+ {
+ 	public CppToggleEnableClangTidySupportAction()
++		: base(Strings.EnableClangTidyAnalysis_Text, (Expression<Func<CppClangTidySettings, bool>>)((CppClangTidySettings key) => key.EnableClangTidySupport))
+ 	{
+-		string enableClangTidyAnalysis_Text = Strings.EnableClangTidyAnalysis_Text;
+-		base._002Ector(enableClangTidyAnalysis_Text, (Expression<Func<CppClangTidySettings, bool>>)((CppClangTidySettings key) => key.EnableClangTidySupport));
++		// @MOD Fix compile
+ 	}
+ 
+ 	public override bool Update(IDataContext context, ActionPresentation presentation, DelegateUpdate nextUpdate)

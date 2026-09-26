@@ -1,0 +1,30 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Tree/BinaryExpression.cs b/JetBrains.ReSharper.Psi.Cpp.Tree/BinaryExpression.cs
+index 68203daf92763ce83bf312345031703d97e12d30..4ee2d4c8c6aebc15628b13a53434eccd1e467778 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Tree/BinaryExpression.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Tree/BinaryExpression.cs
+@@ -137,11 +137,23 @@ public sealed class BinaryExpression : CppExpressionNodeWithCachedDepInfo, ICppR
+ 			return;
+ 		}
+ 		ICppResolvedTypeFactory typeFactory = this.GetTypeFactory();
+-		if (typeFactory.GetDialect().LanguageKind == CppLanguageKind.CppCli && CppExpressionsUtil.IsCliEventSubscription(operatorKind, leftOperand, out var _))
++		CppLanguageKind kind = typeFactory.GetDialect().LanguageKind; // @MOD C++/CX
++		CppTypeContext tc = new CppTypeContext(GetViewPos(), typeFactory);
++		if ((kind == CppLanguageKind.CppCli || kind == CppLanguageKind.CppCx) && CppExpressionsUtil.IsCliEventSubscription(operatorKind, leftOperand, out var prop))
+ 		{
++			// @MOD C++/CX: subscription is a one-argument accessor call, not a binary builtin.
++			if (kind == CppLanguageKind.CppCx && RightOperand is ICppExpressionNode rightOperand)
++			{
++				ICppGroupedFunctionDeclaratorResolveEntity accessor = CppCxxCliPropertyDeclaratorResolveEntityUtil.ResolveFunction(prop, operatorKind);
++				if (accessor != null)
++				{
++					CppQualType parameterType = accessor.GetCppType(typeFactory).GetFunctionParameterType(0);
++					CppExpressionInfo.FromExpression(rightOperand, typeFactory).DoConversion(parameterType, CppConversionParameters.ForCopyInitDecl, in tc, builderParams.InfoAggregatorFactory).TraverseConversion(visitor);
++				}
++			}
+ 			return;
+ 		}
+-		CppTypeContext tc = new CppTypeContext(GetViewPos(), typeFactory);
++		// CppTypeContext tc = new CppTypeContext(GetViewPos(), typeFactory);
+ 		ICppResolvedExpression resolvedRightArgument = GetResolvedRightArgument();
+ 		if (!CppExpressionsUtil.BinaryRequiresOverloading(leftOperand, resolvedRightArgument, operatorKind, typeFactory))
+ 		{

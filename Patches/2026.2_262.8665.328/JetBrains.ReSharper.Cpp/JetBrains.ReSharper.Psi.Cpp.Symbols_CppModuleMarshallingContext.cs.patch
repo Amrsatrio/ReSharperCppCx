@@ -1,0 +1,12 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppModuleMarshallingContext.cs b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppModuleMarshallingContext.cs
+index 2bbb8b762d5048592dd2508706d3f665952ac1ea..15ff5e39ef1ad87752c43c84d8016b53fd135fad 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppModuleMarshallingContext.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppModuleMarshallingContext.cs
+@@ -1815,6 +1815,7 @@ public class CppModuleMarshallingContext : ICppQualifiedNamePartVisitor<CppModul
+ 			if (cppClassOrDelegateSymbol is ICppClassSymbol cppClassSymbol)
+ 			{
+ 				int num = (int)((cppClassOrDelegateSymbol.IsFriend() ? 1u : 0u) | (uint)(cppClassOrDelegateSymbol.IsExplicitInstantiation() ? 2 : 0)) | (cppClassOrDelegateSymbol.IsDefinition() ? 4 : 0);
++				num |= CppClassSymbolUtil.IsCxPartial(cppClassSymbol) ? CppSerializedClassSymbol.CxPartialFlag : 0; // @MOD C++/CX
+ 				myClassSymbols.Add(new CppSerializedClassSymbol
+ 				{
+ 					Location = this.Marshal(cppClassSymbol.Location),

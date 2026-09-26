@@ -1,0 +1,13 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClrUngroupedVariableDeclarator.cs b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClrUngroupedVariableDeclarator.cs
+index f7265247eaea1cc0aca9af79905b165acaf4ddab..20a3b386c602b36dac6b5b82e701c0ebd383bfe3 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClrUngroupedVariableDeclarator.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClrUngroupedVariableDeclarator.cs
+@@ -11,7 +11,7 @@ internal sealed class CppClrUngroupedVariableDeclarator : CppGeneratedVariableDe
+ 	public IClrDeclaredElement ClrDeclaredElement => myClrDeclaredElement;
+ 
+ 	public CppClrUngroupedVariableDeclarator(CppClrClassResolveEntity parent, IField field, in CppClrTypeConverter cvt)
+-		: base(CppGeneratedResolveEntityType.CLR, cvt.ConvertType(field.Type), parent, CppClrNameConverter.ConvertName(field), CppClrTypeConverter.CalculateDeclarationSpecifiers(field), CppLocationAnchor.GeneratedEntity())
++		: base(CppGeneratedResolveEntityType.CLR, cvt.ConvertMemberType(field), parent, CppClrNameConverter.ConvertName(field), CppClrTypeConverter.CalculateDeclarationSpecifiers(field), CppLocationAnchor.GeneratedEntity()) // @MOD C++/CX
+ 	{
+ 		myClrDeclaredElement = field;
+ 		PureVirtualSpecifiers = CppClrTypeConverter.CalculatePureVirtualSpecifiers(parent.ClrDeclaredElement, field);

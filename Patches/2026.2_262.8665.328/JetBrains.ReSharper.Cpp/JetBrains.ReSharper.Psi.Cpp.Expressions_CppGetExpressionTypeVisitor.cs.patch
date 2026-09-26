@@ -1,0 +1,38 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Expressions/CppGetExpressionTypeVisitor.cs b/JetBrains.ReSharper.Psi.Cpp.Expressions/CppGetExpressionTypeVisitor.cs
+index fad3b5812fcae8ab378e94dfbdbb5656fa3ef05a..fa917eddc3e9f36a18cd9b2086a02ead0d14a0c9 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Expressions/CppGetExpressionTypeVisitor.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Expressions/CppGetExpressionTypeVisitor.cs
+@@ -622,7 +622,9 @@ internal sealed class CppGetExpressionTypeVisitor : CppAbstractResolvedExpressio
+ 
+ 	public override CppTypeAndCategory Visit(ICppResolvedCliTypeIdExpression expr)
+ 	{
+-		return new CppTypeAndCategory(myTypeFactory.GetCliHandleType(new CppQualType(myResolveCache.GlobalNamespace.GetBuiltinsRefs().cli_system_type)), CppValueCategory.PR_VALUE);
++		CppGlobalNamespaceResolveEntity.CppBuiltinsRefs builtins = myResolveCache.GlobalNamespace.GetBuiltinsRefs(); // @MOD C++/CX
++		ICppClassResolveEntity type = myTypeFactory.GetDialect().LanguageKind == CppLanguageKind.CppCx ? builtins.cx_platform_type : builtins.cli_system_type;
++		return new CppTypeAndCategory(myTypeFactory.GetCliHandleType(new CppQualType(type)), CppValueCategory.PR_VALUE);
+ 	}
+ 
+ 	public override CppTypeAndCategory Visit(ICppMSAssumeExpression e)
+@@ -873,7 +875,8 @@ internal sealed class CppGetExpressionTypeVisitor : CppAbstractResolvedExpressio
+ 		}
+ 		else if (ShouldBeLValue(decl, entType))
+ 		{
+-			cppValueCategory = ((!decl.IsFunction() && decl.IsCliNonInterfaceClassMember()) ? CppValueCategory.GC_L_VALUE : CppValueCategory.L_VALUE);
++			// @MOD C++/CX: WinRT fields have stable native storage, unlike CLR fields.
++			cppValueCategory = ((!decl.IsFunction() && decl.IsCliNonInterfaceClassMember() && myTypeFactory.GetDialect().LanguageKind != CppLanguageKind.CppCx) ? CppValueCategory.GC_L_VALUE : CppValueCategory.L_VALUE);
+ 		}
+ 		if (cppValueCategory != CppValueCategory.PR_VALUE)
+ 		{
+@@ -959,6 +962,12 @@ internal sealed class CppGetExpressionTypeVisitor : CppAbstractResolvedExpressio
+ 
+ 	private CppTypeAndCategory GetMemberAccessTypeAndCategory(CppTypeAndCategory inner, CppTypeAndCategory obj)
+ 	{
++		// @MOD C++/CX: Member access inherits GC_L_VALUE from a dereferenced hat,
++		// but the field slot itself supports native references and address-taking.
++		if (inner.IsGCLValue() && myTypeFactory.GetDialect().LanguageKind == CppLanguageKind.CppCx)
++		{
++			inner.Category = CppValueCategory.L_VALUE;
++		}
+ 		CppQualType type = inner.Type;
+ 		CppQualType type2 = obj.Type;
+ 		if (type.InternalType == type2.InternalType)

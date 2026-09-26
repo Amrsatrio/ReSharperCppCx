@@ -1,0 +1,15 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppDeclarationBuilderUtil.cs b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppDeclarationBuilderUtil.cs
+index e9b886137ef6a76dc006c88d71e7d24cb9f62c5b..c30cc84eabe9308ee6e57b2b39ed258cf9d4a7ea 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppDeclarationBuilderUtil.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppDeclarationBuilderUtil.cs
+@@ -103,6 +103,10 @@ public static class CppDeclarationBuilderUtil
+ 		orCreateConstructors.AddDeclarator(new CppCxxCliDelegateConstructorResolveEntity(cppMutableClassResolveEntity, orCreateConstructors.Name, CppCxxCliDelegateConstructorResolveEntity.CtorType.GLOBAL_FUNC_CLRCALL));
+ 		orCreateConstructors.AddDeclarator(new CppCxxCliDelegateConstructorResolveEntity(cppMutableClassResolveEntity, orCreateConstructors.Name, CppCxxCliDelegateConstructorResolveEntity.CtorType.GLOBAL_FUNC_CDECL));
+ 		orCreateConstructors.AddDeclarator(new CppCxxCliDelegateConstructorResolveEntity(cppMutableClassResolveEntity, orCreateConstructors.Name, CppCxxCliDelegateConstructorResolveEntity.CtorType.GLOBAL_FUNC_STDCALL));
++		if (resolveCache.TypeFactory.GetDialect().LanguageKind == Language.CppLanguageKind.CppCx) // @MOD C++/CX
++		{
++			orCreateConstructors.AddDeclarator(new CppCxxCliDelegateConstructorResolveEntity(cppMutableClassResolveEntity, orCreateConstructors.Name, CppCxxCliDelegateConstructorResolveEntity.CtorType.CX_LAMBDA));
++		}
+ 		if (replacedDelegateType.GetFunctionParametersCount() > 0)
+ 		{
+ 			CppQualType functionParameterType = cppParsedFunctionDeclaratorResolveEntity.GetCppType(resolveCache.TypeFactory).GetFunctionParameterType(0);

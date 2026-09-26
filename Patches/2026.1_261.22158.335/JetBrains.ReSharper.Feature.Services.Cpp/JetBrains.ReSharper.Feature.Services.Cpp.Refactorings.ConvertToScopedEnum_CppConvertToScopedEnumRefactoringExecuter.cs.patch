@@ -1,0 +1,73 @@
+diff --git a/JetBrains.ReSharper.Feature.Services.Cpp.Refactorings.ConvertToScopedEnum/CppConvertToScopedEnumRefactoringExecuter.cs b/JetBrains.ReSharper.Feature.Services.Cpp.Refactorings.ConvertToScopedEnum/CppConvertToScopedEnumRefactoringExecuter.cs
+index 8c01f6d8b3958e3b037cf07d7a0053a7a3f5ca97..4e9c79e326839e3a0c81c5b3ef760e32b5570940 100644
+--- a/JetBrains.ReSharper.Feature.Services.Cpp.Refactorings.ConvertToScopedEnum/CppConvertToScopedEnumRefactoringExecuter.cs
++++ b/JetBrains.ReSharper.Feature.Services.Cpp.Refactorings.ConvertToScopedEnum/CppConvertToScopedEnumRefactoringExecuter.cs
+@@ -202,6 +202,34 @@ public class CppConvertToScopedEnumRefactoringExecuter : IRefactoringExecuter
+ 			{
+ 				references.ReferencesToQualify.Add(cppTreeElementPointer);
+ 			}
++			// @MOD Fix compile
++			void AddExpressionToCast(CppQualType targetType, ICppExpressionNode expressionNode)
++			{
++				string text = CppPresenter.CreateFromPsiWithViewPos(expressionNode).PresentType(targetType);
++				CppTreeElementPointer<ICppExpressionNode> cppTreeElementPointer = new CppTreeElementPointer<ICppExpressionNode>(expressionNode.GetSourceFile(), expressionNode);
++				AddConflict(cppTreeElementPointer, LocalizedStringExtensions.Format(Strings.ExpressionOfTheEnumerationTypeIsImplicitly_Text, text), ConflictSeverity.Warning);
++				TypeId item = CppPsiPresenter.CreateFromPsiWithViewPos(expressionNode).PresentType(targetType);
++				references.ExpressionsToCast.Add(Tuple.Create(cppTreeElementPointer, item));
++			}
++			void TraverseConversions(ICppConversionProvidingNode conversionProvidingNode)
++			{
++				if (conversionProvidingNode != null)
++				{
++					while (conversionProvidingNode != null)
++					{
++						ConversionsCollector conversionsCollector = new ConversionsCollector(enumerationEntity);
++						conversionProvidingNode.TraverseConversionsOfPsiNode(conversionsCollector);
++						foreach (var (cppExpressionNode2, targetType) in conversionsCollector.Expressions)
++						{
++							if (references.AddedReferencesToCast.Add(cppExpressionNode2.GetComplexOffset()))
++							{
++								AddExpressionToCast(targetType, cppExpressionNode2);
++							}
++						}
++						conversionProvidingNode = conversionProvidingNode.FindContainingConversionProvidingNode();
++					}
++				}
++			}
+ 			if (baseQualifiedReference is DeclarationSpecifierTypename node)
+ 			{
+ 				TraverseConversions(GetConversionProvidingNodeThroughParens(CastExpressionNavigator.GetByTypeId(TypeIdNavigator.GetByDeclarationSpecifiers(DeclarationSpecifiersNavigator.GetByDeclarationSpecifierTypename(node)))?.Expression));
+@@ -227,33 +255,6 @@ public class CppConvertToScopedEnumRefactoringExecuter : IRefactoringExecuter
+ 		});
+ 		myWorkflow.PsiServices.ParallelFinder.FindReferences(searchTargets, CppDeclaredElementUtil.GetSearchDomain(searchTargets), consumer, pi);
+ 		return fileToReferences;
+-		void AddExpressionToCast(CppQualType targetType, ICppExpressionNode expressionNode)
+-		{
+-			string text = CppPresenter.CreateFromPsiWithViewPos(expressionNode).PresentType(targetType);
+-			CppTreeElementPointer<ICppExpressionNode> cppTreeElementPointer = new CppTreeElementPointer<ICppExpressionNode>(expressionNode.GetSourceFile(), expressionNode);
+-			AddConflict(cppTreeElementPointer, LocalizedStringExtensions.Format(Strings.ExpressionOfTheEnumerationTypeIsImplicitly_Text, text), ConflictSeverity.Warning);
+-			TypeId item = CppPsiPresenter.CreateFromPsiWithViewPos(expressionNode).PresentType(targetType);
+-			P_2.references.ExpressionsToCast.Add(Tuple.Create(cppTreeElementPointer, item));
+-		}
+-		void TraverseConversions(ICppConversionProvidingNode conversionProvidingNode)
+-		{
+-			if (conversionProvidingNode != null)
+-			{
+-				while (conversionProvidingNode != null)
+-				{
+-					ConversionsCollector conversionsCollector = new ConversionsCollector(P_1.enumerationEntity);
+-					conversionProvidingNode.TraverseConversionsOfPsiNode(conversionsCollector);
+-					foreach (var (cppExpressionNode2, targetType) in conversionsCollector.Expressions)
+-					{
+-						if (P_1.references.AddedReferencesToCast.Add(cppExpressionNode2.GetComplexOffset()))
+-						{
+-							AddExpressionToCast(targetType, cppExpressionNode2);
+-						}
+-					}
+-					conversionProvidingNode = conversionProvidingNode.FindContainingConversionProvidingNode();
+-				}
+-			}
+-		}
+ 	}
+ 
+ 	private static ICppConversionProvidingNode GetConversionProvidingNodeThroughParens(ICppExpressionNode node)

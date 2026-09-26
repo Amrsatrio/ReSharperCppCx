@@ -1,0 +1,39 @@
+diff --git a/JetBrains.ReSharper.Feature.Services.Cpp.QuickFixes/CppCxReplaceRefPointerFix.cs b/JetBrains.ReSharper.Feature.Services.Cpp.QuickFixes/CppCxReplaceRefPointerFix.cs
+new file mode 100644
+index 0000000000000000000000000000000000000000..498b0f1601cc505b8de1b65fae99769aae20f8bb
+--- /dev/null
++++ b/JetBrains.ReSharper.Feature.Services.Cpp.QuickFixes/CppCxReplaceRefPointerFix.cs
+@@ -0,0 +1,33 @@
++using System;
++using JetBrains.Application.Progress;
++using JetBrains.ProjectModel;
++using JetBrains.ReSharper.Feature.Services.Cpp.Daemon;
++using JetBrains.ReSharper.Psi.Cpp.Tree;
++using JetBrains.ReSharper.Psi.Tree;
++using JetBrains.TextControl;
++using JetBrains.Util;
++
++namespace JetBrains.ReSharper.Feature.Services.Cpp.QuickFixes;
++
++public sealed class CppCxReplaceRefPointerFix : CppQuickFixBase
++{
++	private readonly ITreeNode myNode;
++
++	public CppCxReplaceRefPointerFix(CppCxRefPointerError error)
++	{
++		myNode = error.Node;
++	}
++
++	public override string Text => "Replace '*' with '^'";
++
++	public override bool IsAvailable(IUserDataHolder cache)
++	{
++		return CppNonAbstractDeclaratorNodeUtil.CanReplaceCxRefPointerWithHandle(myNode);
++	}
++
++	protected override Action<ITextControl> ExecutePsiTransaction(ISolution solution, IProgressIndicator progress)
++	{
++		CppNonAbstractDeclaratorNodeUtil.ReplaceCxRefPointerWithHandle(myNode);
++		return null;
++	}
++}

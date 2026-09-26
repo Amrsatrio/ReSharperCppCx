@@ -1,0 +1,131 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppFileSymbolsCache.cs b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppFileSymbolsCache.cs
+index c7dc39c9d378eed0a7bf019b6f679babdc784cb2..3852b82edc611021a0e96e4de4850bba27e9e206 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppFileSymbolsCache.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppFileSymbolsCache.cs
+@@ -7,6 +7,27 @@ namespace JetBrains.ReSharper.Psi.Cpp.Symbols;
+ 
+ public class CppFileSymbolsCache : ICppFileSymbolsCache
+ {
++	// @MOD C++/CX
++	private sealed class CxPartialMappingsChanged : ICppJournalEntry
++	{
++		private readonly CppFileSymbolsCache myCache;
++		private readonly List<KeyValuePair<ICppSymbol, ICppResolveEntity>> myPrevious;
++
++		public CxPartialMappingsChanged(CppFileSymbolsCache cache, List<KeyValuePair<ICppSymbol, ICppResolveEntity>> previous)
++		{
++			myCache = cache;
++			myPrevious = previous;
++		}
++
++		public void Rollback()
++		{
++			foreach (var entry in myPrevious)
++			{
++				myCache.mySymbolToEntityCache[entry.Key] = entry.Value;
++			}
++		}
++	}
++
+ 	private readonly CppLocationAnchor myStartAnchor;
+ 
+ 	private readonly CppPPLocationAnchor myStartPPAnchor;
+@@ -197,6 +218,98 @@ public class CppFileSymbolsCache : ICppFileSymbolsCache
+ 		return value;
+ 	}
+ 
++	// @MOD C++/CX: source PSI nodes must follow the entities rebuilt at the final definition.
++	internal void RefreshCxPartialMemberMappings(CppClassData definition)
++	{
++		if (!myPsiModeEnabled || !definition.HasCxPartialDeclarations())
++		{
++			return;
++		}
++		List<ICppParserSymbol> symbols = null;
++		foreach (ICppSymbol symbol in mySymbolToEntityCache.Keys)
++		{
++			if (!(symbol is ICppParserSymbol parserSymbol))
++			{
++				continue;
++			}
++			for (ICppParserSymbol parent = parserSymbol.Parent; parent != null; parent = parent.Parent)
++			{
++				if (parent is CppClassSymbol { IsCxPartial: true } partial && definition.ContainsSymbol(partial))
++				{
++					(symbols ??= new List<ICppParserSymbol>()).Add(parserSymbol);
++					break;
++				}
++			}
++		}
++		if (symbols == null)
++		{
++			return;
++		}
++		var matches = myResolveCache.RootCache.SymbolLocator.FindResolveEntities(symbols);
++		CppJournal journal = myResolveCache.RootCache.GetCurrentJournal();
++		List<KeyValuePair<ICppSymbol, ICppResolveEntity>> previous = null;
++		foreach (ICppParserSymbol symbol in symbols)
++		{
++			foreach (ICppResolveEntity match in matches[symbol])
++			{
++				ICppResolveEntity replacement = GetCxPartialUngroupedMember(match, symbol);
++				if (replacement == null || ReferenceEquals(replacement, mySymbolToEntityCache[symbol]))
++				{
++					continue;
++				}
++				if (journal != null)
++				{
++					(previous ??= new List<KeyValuePair<ICppSymbol, ICppResolveEntity>>()).Add(
++						new KeyValuePair<ICppSymbol, ICppResolveEntity>(symbol, mySymbolToEntityCache[symbol]));
++				}
++				mySymbolToEntityCache[symbol] = replacement;
++				break;
++			}
++		}
++		if (previous != null)
++		{
++			journal.Add(new CxPartialMappingsChanged(this, previous));
++		}
++	}
++
++	// @MOD C++/CX: PSI caches store individual declarations, not overload groups.
++	private static ICppResolveEntity GetCxPartialUngroupedMember(ICppResolveEntity entity, ICppParserSymbol symbol)
++	{
++		switch (entity)
++		{
++			case Resolve.ICppGroupedFunctionDeclaratorResolveEntity functions:
++				foreach (var declaration in functions.GetUngroupedDeclarators())
++				{
++					if (System.Linq.Enumerable.Contains(declaration.SymbolParts, symbol))
++					{
++						return declaration;
++					}
++				}
++				break;
++			case Resolve.ICppGroupedVariableDeclaratorResolveEntity variables:
++				foreach (var declaration in variables.GetUngroupedDeclarators())
++				{
++					if (System.Linq.Enumerable.Contains(declaration.SymbolParts, symbol))
++					{
++						return declaration;
++					}
++				}
++				break;
++			case Resolve.ICppGroupedTypeDeclaratorResolveEntity types:
++				foreach (var declaration in types.GetUngroupedDeclarators())
++				{
++					if (System.Linq.Enumerable.Contains(declaration.SymbolParts, symbol))
++					{
++						return declaration;
++					}
++				}
++				break;
++			default:
++				return entity;
++		}
++		return null;
++	}
++
+ 	public CppLocationAnchor FindLocationAnchorByOffset(CppComplexOffset offset)
+ 	{
+ 		CppLocationAnchor a = FindAnchorByOffsetImpl(offset, myOffsetToAnchorCache, myStartAnchor);

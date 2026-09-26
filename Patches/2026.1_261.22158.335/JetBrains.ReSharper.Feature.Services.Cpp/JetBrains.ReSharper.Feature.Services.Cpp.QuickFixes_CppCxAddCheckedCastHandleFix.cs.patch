@@ -1,0 +1,41 @@
+diff --git a/JetBrains.ReSharper.Feature.Services.Cpp.QuickFixes/CppCxAddCheckedCastHandleFix.cs b/JetBrains.ReSharper.Feature.Services.Cpp.QuickFixes/CppCxAddCheckedCastHandleFix.cs
+new file mode 100644
+index 0000000000000000000000000000000000000000..1513c5d4ae7e40a014ffef71a4239ce8b72956eb
+--- /dev/null
++++ b/JetBrains.ReSharper.Feature.Services.Cpp.QuickFixes/CppCxAddCheckedCastHandleFix.cs
+@@ -0,0 +1,35 @@
++using JetBrains.ReSharper.Feature.Services.Cpp.Daemon.Highlightings;
++using JetBrains.ReSharper.Psi.Cpp.Tree;
++using JetBrains.ReSharper.Psi.Tree;
++using JetBrains.Util;
++
++namespace JetBrains.ReSharper.Feature.Services.Cpp.QuickFixes;
++
++public sealed class CppCxAddCheckedCastHandleFix : CppScopedNonIncrementalQuickFixBase
++{
++	private readonly ITreeNode myNode;
++
++	public CppCxAddCheckedCastHandleFix(CannotCastError error)
++	{
++		myNode = error.ErrorElement;
++	}
++
++	public override string Text => "Add '^' to the checked-cast target";
++
++	public override string ScopedText => "Add missing handles to checked-cast targets";
++
++	public override bool IsAvailable(IUserDataHolder cache)
++	{
++		return CppTreeModificationUtil.CanAddCxCheckedCastHandle(myNode);
++	}
++
++	protected override ITreeNode TryGetContextTreeNode()
++	{
++		return myNode;
++	}
++
++	protected override void Execute()
++	{
++		CppTreeModificationUtil.AddCxCheckedCastHandle(myNode);
++	}
++}

@@ -1,0 +1,19 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Parsing/CppTokenNodeTypeTraits.cs b/JetBrains.ReSharper.Psi.Cpp.Parsing/CppTokenNodeTypeTraits.cs
+index d4733f746dd35c62e4e07f21d524a7f3cf0030fd..1bd69e718dad5a027d937d20c3b86e0cc0cdea23 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Parsing/CppTokenNodeTypeTraits.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Parsing/CppTokenNodeTypeTraits.cs
+@@ -318,6 +318,14 @@ public sealed class CppTokenNodeTypeTraits
+ 			hashSet.AddRange(CppTokenNodeTypes.CPP_KEYWORDS);
+ 			break;
+ 		}
++		if (dialect.LanguageKind == CppLanguageKind.CppCx) // @MOD C++/CX
++		{
++			hashSet.AddRange(CppTokenNodeTypes.CXXCX_TYPE_TRAIT_KEYWORDS);
++		}
++		else
++		{
++			hashSet.RemoveRange(CppTokenNodeTypes.CXXCX_TYPE_TRAIT_KEYWORDS);
++		}
+ 		if (!dialect.BuiltinChar1632)
+ 		{
+ 			hashSet.Remove(CppTokenNodeTypes.CHAR16_T_KEYWORD);

@@ -1,0 +1,64 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Overload/CppConversionHelper.cs b/JetBrains.ReSharper.Psi.Cpp.Overload/CppConversionHelper.cs
+index 73cb2a7751b89e5642476d750a34a623bc983d3a..16ab0a4e61964fc4fe8bf1dd21703ce8cb132bd5 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Overload/CppConversionHelper.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Overload/CppConversionHelper.cs
+@@ -41,6 +41,26 @@ public struct CppConversionHelper(in CppTypeContext typeContext, CppConversionPa
+ 	{
+ 	}
+ 
++	// @MOD C++/CX: called only after IsBoxable has accepted the source value.
++	// Preserve CLI boxing and CX boxing to Object; reuse the existing boxing
++	// conversion kind so non-boxing overloads keep their preferred ranking.
++	private bool IsCppCxBoxingTarget(CppQualType from, CppQualType to)
++	{
++		if (TypeFactory.GetDialect().LanguageKind != CppLanguageKind.CppCx)
++		{
++			return false;
++		}
++		ICppClassResolveEntity box = to.GetCliHandlePointeeType().GetResolvedClassTypeEntity();
++		if (box == null || box.GetLookupParent() != GetGlobalNamespace().GetBuiltinsRefs().cx_platform_ns)
++		{
++			return false;
++		}
++		CppSubstitutionId name = box.Name.AsSubstitutionId();
++		return name != null && (new CppQualifiedId("IBox").Equals(name.Inner) || new CppQualifiedId("Box").Equals(name.Inner))
++			&& name.Arguments.Length == 1 && name.Arguments[0] is ICppTypeTemplateArgument argument
++			&& CppQualTypeEq.ResolvedEquals(from.ClearCVQuals(), argument.GetQualType());
++	}
++
+ 	/// If a conversion exists, this routine will return the standard conversion sequence required to perform this
+ 	/// conversion. Otherwise, this routine will return null.
+ 	public CppImplicitConversionSequence TryFromStandardConversion(CppExpressionInfo from, CppQualType toT)
+@@ -75,7 +95,11 @@ public struct CppConversionHelper(in CppTypeContext typeContext, CppConversionPa
+ 		if (flag2)
+ 		{
+ 			cppImplicitConversionKind = CppImplicitConversionKind.CliBoxingConversion;
+-			from.Type = new CppQualType(TypeFactory.GetCliHandleType(from.Type.ClearCVQuals()));
++			// @MOD C++/CX: boxing T produces IBox<T>, not a fictitious T^
++			// followed by numeric conversion to an unrelated IBox<U>.
++			from.Type = IsCppCxBoxingTarget(from.Type, toT)
++				? toT.CVUnqualify().WithInputQualifiers(InputQualifiers.Empty)
++				: new CppQualType(TypeFactory.GetCliHandleType(from.Type.ClearCVQuals()));
+ 		}
+ 		else if (flag3 && !from.Type.IsFunctionType() && !from.Type.IsArray())
+ 		{
+@@ -465,7 +489,7 @@ public struct CppConversionHelper(in CppTypeContext typeContext, CppConversionPa
+ 				return new CppBadConversionSequence(CppBadConversionSequence.FailureStatus.GeneralFailure, ReferenceFlag.Empty, typeAndCategory.Type, toT, expression).AttachAggregateInitInfo(cppAggregateInitializationInfo);
+ 			}
+ 		}
+-		if (toT.IsResolvedClassType() && !LanguageIsC())
++		if (toT.IsResolvedClassType() && !toT.IsCliArray() /*@MOD C++/CX*/ && !LanguageIsC())
+ 		{
+ 			if (!flag)
+ 			{
+@@ -1183,7 +1207,9 @@ public struct CppConversionHelper(in CppTypeContext typeContext, CppConversionPa
+ 
+ 	private bool LanguageIsCLI()
+ 	{
+-		return TypeFactory.GetDialect().LanguageKind == CppLanguageKind.CppCli;
++		// return TypeFactory.GetDialect().LanguageKind == CppLanguageKind.CppCli;
++		CppLanguageKind kind = TypeFactory.GetDialect().LanguageKind;
++		return kind == CppLanguageKind.CppCli || kind == CppLanguageKind.CppCx; // @MOD C++/CX
+ 	}
+ 
+ 	private bool LanguageIsHLSL()

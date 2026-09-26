@@ -1,0 +1,12 @@
+diff --git a/JetBrains.ReSharper.Feature.Services.Cpp.csproj b/JetBrains.ReSharper.Feature.Services.Cpp.csproj
+index da219c1ac0b4f635f6a5c33e3687f95e2510469e..a11da95f840ee67bdc45226213ffa073464b0037 100644
+--- a/JetBrains.ReSharper.Feature.Services.Cpp.csproj
++++ b/JetBrains.ReSharper.Feature.Services.Cpp.csproj
+@@ -85,6 +85,7 @@
+     <Reference Include="JetBrains.Platform.Core">
+       <HintPath>..\..\References\JetBrains.Platform.Core.dll</HintPath>
+     </Reference>
++    <Reference Include="PresentationCore" /> <!--@MOD Fix compile; System.Windows.Markup.IAddChild-related errors-->
+     <Reference Include="System.Core" />
+     <Reference Include="JetBrains.Platform.Metadata">
+       <HintPath>..\..\References\JetBrains.Platform.Metadata.dll</HintPath>

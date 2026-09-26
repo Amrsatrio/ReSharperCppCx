@@ -1,0 +1,73 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClrUngroupedFunctionDeclarator.cs b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClrUngroupedFunctionDeclarator.cs
+index bf0751201112dbd1c1cfaaa337acee9a60729f05..fb42f29d747f389789509109c78d334a8ccd165d 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClrUngroupedFunctionDeclarator.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClrUngroupedFunctionDeclarator.cs
+@@ -37,7 +37,7 @@ internal sealed class CppClrUngroupedFunctionDeclarator : CppGeneratedFunctionDe
+ 	{
+ 		myElement = constructor;
+ 		DeclarationSpecifiers = CppClrTypeConverter.CalculateDeclarationSpecifiers(constructor);
+-		myIsExplicit = true;
++		myIsExplicit = constructor.Parameters.Count != 1 || !cvt.IsCppCxNativeGuidAlias(constructor, constructor.Parameters[0].Type); // @MOD C++/CX
+ 		PureVirtualSpecifiers = CppClrTypeConverter.CalculatePureVirtualSpecifiers(parent.ClrDeclaredElement, constructor);
+ 	}
+ 
+@@ -46,7 +46,7 @@ internal sealed class CppClrUngroupedFunctionDeclarator : CppGeneratedFunctionDe
+ 	{
+ 		myElement = function;
+ 		DeclarationSpecifiers = CppClrTypeConverter.CalculateDeclarationSpecifiers(function);
+-		PureVirtualSpecifiers = CppClrTypeConverter.CalculatePureVirtualSpecifiers(parent.ClrDeclaredElement, function);
++		PureVirtualSpecifiers = CalculatePureVirtualSpecifiers(parent.ClrDeclaredElement, function, in cvt); // @MOD C++/CX
+ 		if (name.IsDestructorTag())
+ 		{
+ 			PureVirtualSpecifiers &= ~CppPureVirtualSpecifiers.Sealed;
+@@ -57,9 +57,9 @@ internal sealed class CppClrUngroupedFunctionDeclarator : CppGeneratedFunctionDe
+ 		: base(CppGeneratedResolveEntityType.CLR, cvt.ConvertFunctionType(conv), parent, new CppConversionId(cvt.ConvertType(conv.ReturnType)), CppLocationAnchor.GeneratedEntity())
+ 	{
+ 		myElement = conv;
+-		DeclarationSpecifiers = CppClrTypeConverter.CalculateDeclarationSpecifiers(conv);
++		DeclarationSpecifiers = cvt.TypeFactory.GetDialect().LanguageKind == Language.CppLanguageKind.CppCx ? CppClrTypeConverter.CalculateDeclarationSpecifiers((IModifiersOwner)conv) : CppClrTypeConverter.CalculateDeclarationSpecifiers(conv); // @MOD C++/CX
+ 		myIsExplicit = conv.IsExplicitCast;
+-		PureVirtualSpecifiers = CppClrTypeConverter.CalculatePureVirtualSpecifiers(parent.ClrDeclaredElement, conv);
++		PureVirtualSpecifiers = CalculatePureVirtualSpecifiers(parent.ClrDeclaredElement, conv, in cvt); // @MOD C++/CX
+ 	}
+ 
+ 	public CppClrUngroupedFunctionDeclarator(CppClrClassResolveEntity parent, ISignOperator conv, in CppClrTypeConverter cvt)
+@@ -67,7 +67,7 @@ internal sealed class CppClrUngroupedFunctionDeclarator : CppGeneratedFunctionDe
+ 	{
+ 		myElement = conv;
+ 		DeclarationSpecifiers = CppClrTypeConverter.CalculateDeclarationSpecifiers(conv);
+-		PureVirtualSpecifiers = CppClrTypeConverter.CalculatePureVirtualSpecifiers(parent.ClrDeclaredElement, conv);
++		PureVirtualSpecifiers = CalculatePureVirtualSpecifiers(parent.ClrDeclaredElement, conv, in cvt); // @MOD C++/CX
+ 	}
+ 
+ 	public CppClrUngroupedFunctionDeclarator(CppCxxCliClrPropertyResolveEntity parent, IAccessor accessor, in CppClrTypeConverter cvt)
+@@ -75,7 +75,15 @@ internal sealed class CppClrUngroupedFunctionDeclarator : CppGeneratedFunctionDe
+ 	{
+ 		myElement = accessor;
+ 		DeclarationSpecifiers = CppClrTypeConverter.CalculateDeclarationSpecifiers(accessor);
+-		PureVirtualSpecifiers = CppClrTypeConverter.CalculatePureVirtualSpecifiers(parent.ClrDeclaredElement.GetContainingType(), accessor);
++		PureVirtualSpecifiers = CalculatePureVirtualSpecifiers(parent.ClrDeclaredElement.GetContainingType(), accessor, in cvt); // @MOD C++/CX
++	}
++
++	// @MOD C++/CX: a final metadata method still implements its interface slot,
++	// but is not a CX override candidate. PSI may hide final on newslot methods.
++	private static CppPureVirtualSpecifiers CalculatePureVirtualSpecifiers(IClrDeclaredElement parent, IOverridableMember function, in CppClrTypeConverter cvt)
++	{
++		CppPureVirtualSpecifiers specifiers = CppClrTypeConverter.CalculatePureVirtualSpecifiers(parent, function);
++		return cvt.IsCppCxFinalMethod(function) ? specifiers | CppPureVirtualSpecifiers.Sealed : specifiers;
+ 	}
+ 
+ 	public override CppAccessibility GetAccessibility()
+@@ -109,6 +117,12 @@ internal sealed class CppClrUngroupedFunctionDeclarator : CppGeneratedFunctionDe
+ 			{
+ 				cvt = new CppClrTypeConverter(cvt, entity, Name);
+ 			}
++			// @MOD C++/CX: native MethodImpls use native interface and accessor identity,
++			// independently of whether CLR projection can resolve those interfaces.
++			if (cvt.TryGetCppCxOverrideTargets(overridableMember, this, out List<ICppResolveEntity> nativeTargets))
++			{
++				return myOverrideSpecifiers = nativeTargets;
++			}
+ 			List<ICppResolveEntity> list = new List<ICppResolveEntity>();
+ 			foreach (IExplicitImplementation explicitImplementation in overridableMember.ExplicitImplementations)
+ 			{

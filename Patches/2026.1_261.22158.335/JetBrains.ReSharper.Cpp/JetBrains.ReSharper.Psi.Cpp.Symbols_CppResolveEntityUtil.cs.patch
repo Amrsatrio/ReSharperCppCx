@@ -1,0 +1,22 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppResolveEntityUtil.cs b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppResolveEntityUtil.cs
+index 83708e44d8a4a12734814a857b853f558d9a568e..25d14ef4f423d0bcfa00669eeee552f09e6619f9 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppResolveEntityUtil.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppResolveEntityUtil.cs
+@@ -3689,7 +3689,7 @@ public static class CppResolveEntityUtil
+ 		CppLanguageDialect languageDialect = ent.GetLanguageDialect();
+ 		if (ent.IsConstructorDeclarator() || ent.IsDestructorDeclarator())
+ 		{
+-			if (!ent.IsCliClassOrInterfaceMember())
++			if (languageDialect.LanguageKind == CppLanguageKind.CppCx || !ent.IsCliClassOrInterfaceMember()) // @MOD C++/CX
+ 			{
+ 				return languageDialect.DefaultCtorDtorCallingConvention;
+ 			}
+@@ -3697,7 +3697,7 @@ public static class CppResolveEntityUtil
+ 		}
+ 		if (ent.IsClassDataOrFunctionMember())
+ 		{
+-			if (!ent.IsCliClassOrInterfaceMember())
++			if (languageDialect.LanguageKind == CppLanguageKind.CppCx || !ent.IsCliClassOrInterfaceMember()) // @MOD C++/CX
+ 			{
+ 				return languageDialect.DefaultMemberCallingConvention;
+ 			}

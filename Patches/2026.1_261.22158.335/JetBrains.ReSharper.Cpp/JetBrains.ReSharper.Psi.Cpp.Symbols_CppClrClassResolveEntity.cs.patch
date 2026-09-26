@@ -1,0 +1,214 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClrClassResolveEntity.cs b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClrClassResolveEntity.cs
+index ba4e6db653d21b36abbc756304ffc3175ef93199..9ac4a06b9e4676c922b25ef08ab89e962030e04c 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClrClassResolveEntity.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClrClassResolveEntity.cs
+@@ -134,8 +134,53 @@ public sealed class CppClrClassResolveEntity : CppType, ICppMutableClassResolveE
+ 		myBuiltinClass = ICppClrClassResolveEntity.BuiltinClass.NONE;
+ 		myPredefinedType = CppPredefinedType.Void;
+ 		myNotMergedSymbolsState = NotMergedState.WANT;
+-		myClassKey = ComputeClassKey(myClazz);
+-		if (!(scope is CppClrNamespaceResolveEntity cppClrNamespaceResolveEntity) || !cppClrNamespaceResolveEntity.IsSystemNamespace())
++		myClassKey = scope.GetFileResolveCache().TypeFactory.GetDialect().LanguageKind == Language.CppLanguageKind.CppCx ? ComputeClassKeyCx(myClazz) : ComputeClassKey(myClazz); // @MOD C++/CX
++		/*if (!(scope is CppClrNamespaceResolveEntity cppClrNamespaceResolveEntity) || !cppClrNamespaceResolveEntity.IsSystemNamespace())
++		{
++			return;
++		}*/
++		// @MOD C++/CX
++		if (scope is not CppClrNamespaceResolveEntity clrNs)
++		{
++			return;
++		}
++		if (scope.GetFileResolveCache().TypeFactory.GetDialect().LanguageKind == Language.CppLanguageKind.CppCx)
++		{
++			myPredefinedType = CppClrTypeConverter.GetPredefinedTypeCx(clazz, scope.GetFileResolveCache().TypeFactory.GetDialect(), out var foundCx);
++			if (foundCx)
++			{
++				myBuiltinClass = ICppClrClassResolveEntity.BuiltinClass.Predefined;
++				return;
++			}
++
++			if (!clrNs.IsPlatformNamespace())
++			{
++				return;
++			}
++			switch (clazz.ShortName)
++			{
++			case "Object":
++				myBuiltinClass = ICppClrClassResolveEntity.BuiltinClass.Object;
++				return;
++			case "ValueType":
++				myBuiltinClass = ICppClrClassResolveEntity.BuiltinClass.ValueType;
++				return;
++			case "String":
++				myBuiltinClass = ICppClrClassResolveEntity.BuiltinClass.String;
++				return;
++			case "Enum":
++				myBuiltinClass = ICppClrClassResolveEntity.BuiltinClass.Enum;
++				return;
++			case "IDisposable":
++				myBuiltinClass = ICppClrClassResolveEntity.BuiltinClass.IDisposable;
++				return;
++			case "Delegate":
++				myBuiltinClass = ICppClrClassResolveEntity.BuiltinClass.Delegate;
++				return;
++			}
++			return;
++		}
++		if (!clrNs.IsSystemNamespace())
+ 		{
+ 			return;
+ 		}
+@@ -758,6 +803,26 @@ public sealed class CppClrClassResolveEntity : CppType, ICppMutableClassResolveE
+ 		return myChildren;
+ 	}
+ 
++	// @MOD C++/CX
++	private static CppClassKey ComputeClassKeyCx(ITypeElement element)
++	{
++		string fullName = element.GetClrName().FullName;
++		// The intrinsic roots themselves remain ref classes, including Enum : ValueType.
++		if (fullName == "Platform.Enum" || fullName == "Platform.ValueType")
++		{
++			return CppClassKey.REF_CLASS;
++		}
++		// The CLR reader only recognizes System.ValueType; platform.winmd uses Platform.ValueType.
++		foreach (IDeclaredType superType in element.GetSuperTypes())
++		{
++			if (superType.GetClrName().FullName == "Platform.ValueType")
++			{
++				return CppClassKey.VALUE_CLASS;
++			}
++		}
++		return ComputeClassKey(element);
++	}
++
+ 	public static CppClassKey ComputeClassKey(ITypeElement element)
+ 	{
+ 		if (element is IClass)
+@@ -817,7 +882,7 @@ public sealed class CppClrClassResolveEntity : CppType, ICppMutableClassResolveE
+ 				AddChild(Import(this, nestedType));
+ 			}
+ 			myConversions = CppDeclaratorResolveEntityPack.Create(this, CppConversionsPackId.INSTANCE, CppLocationAnchor.GeneratedEntity());
+-			foreach (ITypeMember member in myClazz.GetMembers())
++			foreach (ITypeMember member in cvt.GetMembers(myClazz)) // @MOD C++/CX
+ 			{
+ 				ICppDeclaratorResolveEntity cppDeclaratorResolveEntity = null;
+ 				if (member is IMethod method)
+@@ -894,7 +959,7 @@ public sealed class CppClrClassResolveEntity : CppType, ICppMutableClassResolveE
+ 			}
+ 			if (myClazz is IDelegate obj2)
+ 			{
+-				CppClrTypeConverter cvt2 = new CppClrTypeConverter(this);
++				CppClrTypeConverter cvt2 = cvt; // @MOD C++/CX: reuse the native signature import.
+ 				CppClrUngroupedFunctionDeclarator cppClrUngroupedFunctionDeclarator = new CppClrUngroupedFunctionDeclarator(this, obj2.InvokeMethod, CppOperatorId.PAREN_OPERATOR_NAME, in cvt2);
+ 				CppQualifiedNamePart innerIfTemplateId2 = cppClrUngroupedFunctionDeclarator.Name.GetInnerIfTemplateId();
+ 				CppLocationAnchor anchor2 = CppLocationAnchor.GeneratedEntity();
+@@ -907,6 +972,10 @@ public sealed class CppClrClassResolveEntity : CppType, ICppMutableClassResolveE
+ 				myConstructors.AddDeclarator(new CppCxxCliDelegateConstructorResolveEntity(this, innerIfTemplateId3, CppCxxCliDelegateConstructorResolveEntity.CtorType.GLOBAL_FUNC_CLRCALL));
+ 				myConstructors.AddDeclarator(new CppCxxCliDelegateConstructorResolveEntity(this, innerIfTemplateId3, CppCxxCliDelegateConstructorResolveEntity.CtorType.GLOBAL_FUNC_CDECL));
+ 				myConstructors.AddDeclarator(new CppCxxCliDelegateConstructorResolveEntity(this, innerIfTemplateId3, CppCxxCliDelegateConstructorResolveEntity.CtorType.GLOBAL_FUNC_STDCALL));
++				if (cvt.TypeFactory.GetDialect().LanguageKind == Language.CppLanguageKind.CppCx) // @MOD C++/CX
++				{
++					myConstructors.AddDeclarator(new CppCxxCliDelegateConstructorResolveEntity(this, innerIfTemplateId3, CppCxxCliDelegateConstructorResolveEntity.CtorType.CX_LAMBDA));
++				}
+ 				if (obj3.InvokeMethod.Parameters.Count > 0)
+ 				{
+ 					myConstructors.AddDeclarator(new CppCxxCliDelegateConstructorResolveEntity(this, innerIfTemplateId3, CppCxxCliDelegateConstructorResolveEntity.CtorType.THIS_ARG_MEMBER_FUNC));
+@@ -938,6 +1007,10 @@ public sealed class CppClrClassResolveEntity : CppType, ICppMutableClassResolveE
+ 					}
+ 				}
+ 			}
++			if (cvt.TypeFactory.GetDialect().LanguageKind == Language.CppLanguageKind.CppCx && GetKey().IsCliValueClass()) // @MOD C++/CX
++			{
++				GenerateCppCxValueSpecialMembers(cvt.TypeFactory);
++			}
+ 			if (myDestructors == null)
+ 			{
+ 				CppQualifiedNamePart destructorNameByClass = Name.GetDestructorNameByClass();
+@@ -967,6 +1040,32 @@ public sealed class CppClrClassResolveEntity : CppType, ICppMutableClassResolveE
+ 		myNotMergedSymbolsState = NotMergedState.DONE;
+ 	}
+ 
++	// @MOD C++/CX
++	private void GenerateCppCxValueSpecialMembers(ICppResolvedTypeFactory typeFactory)
++	{
++		bool hasDefaultConstructor = false;
++		bool hasCopyConstructor = false;
++		foreach (CppGroupedFunctionDeclaratorResolveEntity constructor in myConstructors.GetGroupedFunctions())
++		{
++			hasDefaultConstructor |= constructor.IsDefaultConstructorDeclarator();
++			hasCopyConstructor |= this.GetConstructorKind(constructor, constructor.GetTypeWithUndefinedReturnTypeAndCallingConvention(typeFactory)) == CppConstructorKind.COPY;
++		}
++		if (!hasDefaultConstructor)
++		{
++			myConstructors.AddGroupedDeclarator(CppGenerateImplicitMembersUtil.GenerateDefaultConstructorOfManagedClass(this, typeFactory));
++		}
++		CppQualType classType = new CppQualType(this);
++		CppQualType copyParameterType = CppGenerateImplicitMembersUtil.CopyParameterType(classType);
++		if (!hasCopyConstructor)
++		{
++			CppQualType copyType = typeFactory.GetFunctionType(classType, new[] { copyParameterType }, CppFunctionFlags.ClrCall);
++			myConstructors.AddGroupedDeclarator(CppGenerateImplicitMembersUtil.GenerateImplicitMember(copyType, this, Name.GetConstructorNameByClass(), null, null));
++		}
++		CppQualType assignmentType = typeFactory.GetFunctionType(classType.WithChangedRefFlag(ReferenceFlag.Lval), new[] { copyParameterType }, CppFunctionFlags.ClrCall);
++		CppDeclaratorCreationUtil.FindOrCreateDeclaratorGroup(this, CppOperatorId.EQ_OPERATOR_NAME, CppLocationAnchor.GeneratedEntity())
++			.AddGroupedDeclarator(CppGenerateImplicitMembersUtil.GenerateImplicitMember(assignmentType, this, CppOperatorId.EQ_OPERATOR_NAME, null, null));
++	}
++
+ 	private void MergeBases(in CppClrTypeConverter cvt)
+ 	{
+ 		CppList<CppBasicBaseDescription<CppQualType>> cppList = default(CppList<CppBasicBaseDescription<CppQualType>>);
+@@ -974,14 +1073,19 @@ public sealed class CppClrClassResolveEntity : CppType, ICppMutableClassResolveE
+ 		{
+ 			bool flag = GetKey().IsCliInterface();
+ 			bool flag2 = true;
+-			foreach (IDeclaredType superType in myClazz.GetSuperTypes())
++			foreach (IDeclaredType superType in cvt.GetSuperTypes(myClazz)) // @MOD C++/CX
+ 			{
+ 				ITypeElement typeElement = superType.GetTypeElement();
+-				if (typeElement == null || Contains(typeElement.GetAllSuperTypes(), myClazz))
++				if ((typeElement == null && cvt.TypeFactory.GetDialect().LanguageKind != Language.CppLanguageKind.CppCx)
++					|| (typeElement != null && Contains(typeElement.GetAllSuperTypes(), myClazz))) // @MOD C++/CX
+ 				{
+ 					continue;
+ 				}
+-				ICppClassResolveEntity cppClassResolveEntity = cvt.LookupClrClass(typeElement);
++				// @MOD C++/CX: convert before lookup, otherwise CLR-projected interfaces
++				// (or missing CLR projection assemblies) discard the native inheritance.
++				bool isCx = cvt.TypeFactory.GetDialect().LanguageKind == Language.CppLanguageKind.CppCx;
++				CppQualType nativeBase = isCx ? cvt.ConvertBaseType(superType) : CppQualType.NullType();
++				ICppClassResolveEntity cppClassResolveEntity = isCx ? nativeBase.GetResolvedClassTypeEntity() : cvt.LookupClrClass(typeElement);
+ 				if (cppClassResolveEntity == null)
+ 				{
+ 					continue;
+@@ -992,9 +1096,9 @@ public sealed class CppClrClassResolveEntity : CppType, ICppMutableClassResolveE
+ 				{
+ 					specifiers = CppBaseSpecifiers.VIRTUAL | CppBaseSpecifiers.IMPLICIT;
+ 				}
+-				if (cppClassResolveEntity.Name.IsTemplateId())
++				if (isCx || cppClassResolveEntity.Name.IsTemplateId())
+ 				{
+-					CppQualType cppQualType = cvt.ConvertBaseType(superType);
++					CppQualType cppQualType = isCx ? nativeBase : cvt.ConvertBaseType(superType);
+ 					cppList.Add(new CppBasicBaseDescription<CppQualType>(specifiers, cppQualType));
+ 					ICppClassResolveEntity resolvedClassTypeEntity = cppQualType.GetResolvedClassTypeEntity();
+ 					if (resolvedClassTypeEntity != null)
+@@ -1017,7 +1121,8 @@ public sealed class CppClrClassResolveEntity : CppType, ICppMutableClassResolveE
+ 			if (flag2)
+ 			{
+ 				CppGlobalNamespaceResolveEntity.CppBuiltinsRefs builtinsRefs = cvt.GlobalNamespace.GetBuiltinsRefs();
+-				ICppClassResolveEntity cppClassResolveEntity2 = (GetKey().IsCliValueClass() ? builtinsRefs.cli_system_valuetype : builtinsRefs.cli_system_object);
++				Language.CppLanguageKind kind = cvt.GlobalNamespace.SymbolCache.GetDialect().LanguageKind; // @MOD C++/CX
++				ICppClassResolveEntity cppClassResolveEntity2 = (GetKey().IsCliValueClass() ? builtinsRefs.GetManagedValueType(kind) : builtinsRefs.GetManagedObject(kind)); // @MOD C++/CX
+ 				if (cppClassResolveEntity2 != null && cppClassResolveEntity2 != this)
+ 				{
+ 					CppBaseSpecifiers cppBaseSpecifiers = CppBaseSpecifiers.PUBLIC | CppBaseSpecifiers.IMPLICIT;
+@@ -1032,7 +1137,7 @@ public sealed class CppClrClassResolveEntity : CppType, ICppMutableClassResolveE
+ 		}
+ 		else if (GetKey().IsEnum())
+ 		{
+-			ICppClassResolveEntity cli_system_enum = cvt.GlobalNamespace.GetBuiltinsRefs().cli_system_enum;
++			ICppClassResolveEntity cli_system_enum = cvt.GlobalNamespace.GetBuiltinsRefs().GetManagedEnum(cvt.GlobalNamespace.SymbolCache.GetDialect().LanguageKind); // @MOD C++/CX
+ 			if (cli_system_enum != null)
+ 			{
+ 				CppBaseSpecifiers specifiers2 = CppBaseSpecifiers.PUBLIC | CppBaseSpecifiers.IMPLICIT;

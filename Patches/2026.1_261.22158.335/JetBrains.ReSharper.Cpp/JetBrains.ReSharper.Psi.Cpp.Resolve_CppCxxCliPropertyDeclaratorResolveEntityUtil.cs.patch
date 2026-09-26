@@ -1,0 +1,31 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Resolve/CppCxxCliPropertyDeclaratorResolveEntityUtil.cs b/JetBrains.ReSharper.Psi.Cpp.Resolve/CppCxxCliPropertyDeclaratorResolveEntityUtil.cs
+index 2c580dcf58a8bca0b28da5ffdb680b5d456dd7ae..7d1a4ea8c581284333efa1def07546c60bba4487 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Resolve/CppCxxCliPropertyDeclaratorResolveEntityUtil.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Resolve/CppCxxCliPropertyDeclaratorResolveEntityUtil.cs
+@@ -1,10 +1,26 @@
+ using JetBrains.Annotations;
+ using JetBrains.ReSharper.Psi.Cpp.Symbols;
+ 
++// @MOD C++/CX Imports
++using JetBrains.ReSharper.Psi.Cpp.Lookup;
++using JetBrains.ReSharper.Psi.Cpp.Types;
++
+ namespace JetBrains.ReSharper.Psi.Cpp.Resolve;
+ 
+ public static class CppCxxCliPropertyDeclaratorResolveEntityUtil
+ {
++	// @MOD C++/CX
++	private static readonly CppQualifiedName EventRegistrationTokenName = CppQualifiedName.Create(
++		CppQualifiedName.Create(CppQualifiedName.Create(CppGlobalNamespaceId.INSTANCE, new CppQualifiedId("Windows")),
++			new CppQualifiedId("Foundation")), new CppQualifiedId("EventRegistrationToken"));
++
++	// @MOD C++/CX
++	public static CppQualType GetEventRegistrationTokenType(ICppResolveEntity eventEntity, ICppResolvedTypeFactory factory)
++	{
++		CppViewPos viewPos = CppViewPos.Full(CppGlobalNamespaceResolveEntity.GetInstance(eventEntity));
++		return CppLookup.SimpleLookup(in viewPos, EventRegistrationTokenName, CppClassTag.NO_TAG).LookupResultToQualType(factory);
++	}
++
+ 	[CanBeNull]
+ 	public static ICppGroupedFunctionDeclaratorResolveEntity ResolveFunction(ICppCxxCliPropertyDeclaratorResolveEntity prop, CppOperatorKind op)
+ 	{

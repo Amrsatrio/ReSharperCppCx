@@ -1,0 +1,44 @@
+diff --git a/JetBrains.ReSharper.Feature.Services.Cpp.Daemon/CppCodeFoldingProcessor.cs b/JetBrains.ReSharper.Feature.Services.Cpp.Daemon/CppCodeFoldingProcessor.cs
+index 68936a4c072b9324bca9bec8ddd9cedd2562873d..e71717b9cb9736facea7ed636c35778824f63311 100644
+--- a/JetBrains.ReSharper.Feature.Services.Cpp.Daemon/CppCodeFoldingProcessor.cs
++++ b/JetBrains.ReSharper.Feature.Services.Cpp.Daemon/CppCodeFoldingProcessor.cs
+@@ -21,7 +21,7 @@ using JetBrains.Util;
+ 
+ namespace JetBrains.ReSharper.Feature.Services.Cpp.Daemon;
+ 
+-public class CppCodeFoldingProcessor : ICodeFoldingProcessor, IRecursiveElementProcessor<FoldingHighlightingConsumer>
++public class CppCodeFoldingProcessor([CanBeNull] IContextBoundSettingsStore settingsStore) : ICodeFoldingProcessor, IRecursiveElementProcessor<FoldingHighlightingConsumer>
+ {
+ 	private readonly Stack<PPPragmaDirective> myCurrentPragmas = new Stack<PPPragmaDirective>();
+ 
+@@ -31,7 +31,7 @@ public class CppCodeFoldingProcessor : ICodeFoldingProcessor, IRecursiveElementP
+ 
+ 	private static readonly NodeTypeSet ourImportTypesToJoin = new NodeTypeSet(CppCompositeNodeTypes.IMPORT_DIRECTIVE, CppCompositeNodeTypes.MS_IMPORT_DIRECTIVE, CppCompositeNodeTypes.CPP20_IMPORT_HEADER_UNIT_DIRECTIVE);
+ 
+-	private readonly bool myFoldWhitespacesBeforeBlock;
++	private readonly bool myFoldWhitespacesBeforeBlock = (byte)(settingsStore == null ? 0 : settingsStore.GetValue((CppCodeFoldingSettingsKey key) => key.FoldBeforeLBrace) ? 1 : 0) != 0; // @MOD Fix compile
+ 
+ 	private static readonly NodeTypeSet VALID_NON_COMPILED_SIBLINGS = CppTokenNodeTypes.WHITESPACES_AND_COMMENTS_WITHOUT_NOT_COMPILED_CODE.Union(CppCompositeNodeTypes.CONDITIONALLY_NOT_COMPILED_FRAGMENT, CppCompositeNodeTypes.PP_PRAGMA_DIRECTIVE, CppCompositeNodeTypes.DIRECTIVE);
+ 
+@@ -39,20 +39,7 @@ public class CppCodeFoldingProcessor : ICodeFoldingProcessor, IRecursiveElementP
+ 
+ 	private static readonly Regex ourEndRegionRegex = new Regex("^[/*]*\\s*endregion.*$", RegexOptions.Multiline);
+ 
+-	public CppCodeFoldingProcessor([CanBeNull] IContextBoundSettingsStore settingsStore)
+-	{
+-		int num;
+-		if (settingsStore == null)
+-		{
+-			num = 0;
+-		}
+-		else
+-		{
+-			num = (settingsStore.GetValue((CppCodeFoldingSettingsKey key) => key.FoldBeforeLBrace) ? 1 : 0);
+-		}
+-		myFoldWhitespacesBeforeBlock = (byte)num != 0;
+-		base._002Ector();
+-	}
++	// @MOD Fix compile
+ 
+ 	public bool InteriorShouldBeProcessed(ITreeNode element, FoldingHighlightingConsumer context)
+ 	{

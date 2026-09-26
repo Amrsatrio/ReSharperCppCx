@@ -1,0 +1,22 @@
+diff --git a/JetBrains.ReSharper.Feature.Services.Cpp.Daemon/CppCxRefPointerError.cs b/JetBrains.ReSharper.Feature.Services.Cpp.Daemon/CppCxRefPointerError.cs
+new file mode 100644
+index 0000000000000000000000000000000000000000..031cf58a447bc17799a127176a164c14c26703be
+--- /dev/null
++++ b/JetBrains.ReSharper.Feature.Services.Cpp.Daemon/CppCxRefPointerError.cs
+@@ -0,0 +1,16 @@
++using JetBrains.ReSharper.Feature.Services.Daemon;
++using JetBrains.ReSharper.Psi.Tree;
++
++namespace JetBrains.ReSharper.Feature.Services.Cpp.Daemon;
++
++[StaticSeverityHighlighting(Severity.ERROR, typeof(CppCompilerErrors), OverlapResolve = OverlapResolveKind.ERROR)]
++public sealed class CppCxRefPointerError : CppSyntaxError
++{
++	public ITreeNode Node { get; }
++
++	public CppCxRefPointerError(string message, ITreeNode node)
++		: base(message, node.GetDocumentRange())
++	{
++		Node = node;
++	}
++}

@@ -1,0 +1,31 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Caches/CppSymbolTableMerger.cs b/JetBrains.ReSharper.Psi.Cpp.Caches/CppSymbolTableMerger.cs
+index c6a5c950525670a606f7b5e931e803b3b3b2cdb3..17277164ac89cd9605ebb4aa5d8be094f66939d4 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Caches/CppSymbolTableMerger.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Caches/CppSymbolTableMerger.cs
+@@ -1618,6 +1618,14 @@ public static class CppSymbolTableMerger
+ 				return cppMutableClassResolveEntity;
+ 			}
+ 			ICppDefinitionClassSymbol cppDefinitionClassSymbol = classSymbol as ICppDefinitionClassSymbol;
++			// @MOD C++/CX: retain partial symbols, but defer their contents until
++			// the final definition. Their original anchor range still belongs to them.
++			if (CppClassSymbolUtil.IsCxPartial(classSymbol))
++			{
++				IncrementAnchorUpTo(myCache, endAnchor);
++				myCache.IncrementCurrentAnchor();
++				return cppMutableClassResolveEntity;
++			}
+ 			if (cppDefinitionClassSymbol != null)
+ 			{
+ 				if (cppDefinitionClassSymbol.IsAnonymousClass())
+@@ -1665,6 +1673,11 @@ public static class CppSymbolTableMerger
+ 			}
+ 			if (cppDefinitionClassSymbol != null)
+ 			{
++				// @MOD C++/CX: eager merging follows the same body order as lazy merging.
++				if (cppMutableClassResolveEntity is CppClassData classData)
++				{
++					classData.PrepareCxPartialDefinition();
++				}
+ 				cppMutableClassResolveEntity.ResolveBases();
+ 			}
+ 			MergeClassNonLazyImpl(classSymbol, cppMutableClassResolveEntity);

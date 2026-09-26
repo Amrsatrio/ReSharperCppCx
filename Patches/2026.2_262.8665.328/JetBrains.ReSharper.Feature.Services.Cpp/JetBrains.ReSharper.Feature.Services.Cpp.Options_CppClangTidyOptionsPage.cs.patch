@@ -1,0 +1,14 @@
+diff --git a/JetBrains.ReSharper.Feature.Services.Cpp.Options/CppClangTidyOptionsPage.cs b/JetBrains.ReSharper.Feature.Services.Cpp.Options/CppClangTidyOptionsPage.cs
+index accd3079b3d13b2f49aa86fc3829cfdc7add5d0d..1fa4403003669c4d6090a968e827bd87c5bb639b 100644
+--- a/JetBrains.ReSharper.Feature.Services.Cpp.Options/CppClangTidyOptionsPage.cs
++++ b/JetBrains.ReSharper.Feature.Services.Cpp.Options/CppClangTidyOptionsPage.cs
+@@ -61,7 +61,8 @@ public class CppClangTidyOptionsPage : BeSimpleOptionsPage
+ 		property.FlowInto(lifetime, valueProperty, (FileSystemPath path) => path.FullPath);
+ 		property2.FlowInto(lifetime, valueProperty2, (FileSystemPath path) => path.FullPath);
+ 		BeCheckbox beCheckbox = AddBoolOption((CppClangTidySettings key) => key.UseSpecificConfigFile, JetBrains.ReSharper.Feature.Services.Cpp.Resources.Strings._UseASpecificClangTidyConfiguration_BoolOption_Text);
+-		BeControl configFilePathViewModel = AddFileChooserOption(property2, JetBrains.ReSharper.Feature.Services.Cpp.Resources.Strings.PathToTheClangTidyConfigurationFile_FileChooserOption_ToolTip, null, null, commonFileDialogs, null, canBeEmpty: true);
++		BeControl configFilePathViewModel = AddFileChooserOption(property2, JetBrains.ReSharper.Feature.Services.Cpp.Resources.Strings.PathToTheClangTidyConfigurationFile_FileChooserOption_ToolTip, null, null, commonFileDialogs, null, canBeEmpty: true,
++			null, null, null, null, null); // @MOD Fix compile
+ 		configFilePathViewModel.Enabled.Value = beCheckbox.Property.Value ?? false;
+ 		beCheckbox.Property.Change.Advise(lifetime, delegate(bool? b)
+ 		{

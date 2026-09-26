@@ -1,0 +1,13 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Parsing.Preprocessor/CppRootInclusionContext.cs b/JetBrains.ReSharper.Psi.Cpp.Parsing.Preprocessor/CppRootInclusionContext.cs
+index e75ba199e021fa8ad2250bd5db0721028b594132..15391fb16387b2f9dc32b5703c30a4ac0006f3d5 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Parsing.Preprocessor/CppRootInclusionContext.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Parsing.Preprocessor/CppRootInclusionContext.cs
+@@ -754,7 +754,7 @@ public class CppRootInclusionContext : CppInclusionContext
+ 
+ 	public static CppRootInclusionContext CreateEmptyContext(CppGlobalSymbolCache globalCache, IPsiModule module, CppLanguageDialect dialect)
+ 	{
+-		ISymbolScope clrSymbolScope = ((dialect.LanguageKind == CppLanguageKind.CppCli) ? module.GetPsiServices().Symbols.GetSymbolScope(module, withReferences: true, caseSensitive: true) : null);
++		ISymbolScope clrSymbolScope = (dialect.LanguageKind is CppLanguageKind.CppCli or CppLanguageKind.CppCx /*@MOD C++/CX*/ ? module.GetPsiServices().Symbols.GetSymbolScope(module, withReferences: true, caseSensitive: true) : null);
+ 		return Create(CppCompilationProperties.Default, null, null, globalCache, CppFileLocation.EMPTY, CppFileLocation.EMPTY, dialect, 0L, allowPendingActions: false, collectPPUsages: false, Lifetime.Eternal, clrSymbolScope);
+ 	}
+ 

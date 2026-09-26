@@ -1,0 +1,17 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Expressions/CppSingleArgumentTypeTraitKind.cs b/JetBrains.ReSharper.Psi.Cpp.Expressions/CppSingleArgumentTypeTraitKind.cs
+index aec70d4a46a3a153d4fcdfeb7b852e5d13081b93..4091af252f8175db98f68fa15fadae1ea3c0dd42 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Expressions/CppSingleArgumentTypeTraitKind.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Expressions/CppSingleArgumentTypeTraitKind.cs
+@@ -67,5 +67,11 @@ public enum CppSingleArgumentTypeTraitKind
+ 	IS_INTEGRAL,
+ 	IS_FLOATING_POINT,
+ 	IS_IMPLICIT_LIFETIME,
+-	IS_STRUCTURAL
++	IS_STRUCTURAL,
++
++	// @MOD C++/CX
++	IS_WIN_CLASS,
++	IS_WIN_INTERFACE,
++	IS_WINRT_AGILE,
++	IS_VALID_WINRT_TYPE
+ }

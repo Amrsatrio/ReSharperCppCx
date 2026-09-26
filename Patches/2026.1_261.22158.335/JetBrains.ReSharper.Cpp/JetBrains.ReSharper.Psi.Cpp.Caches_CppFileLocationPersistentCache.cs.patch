@@ -1,0 +1,15 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Caches/CppFileLocationPersistentCache.cs b/JetBrains.ReSharper.Psi.Cpp.Caches/CppFileLocationPersistentCache.cs
+index 5f6431fc8d578d418a4ee1b80e1275ee98a6fe31..3950065cf7fc5f89a602fb2dab15383ccf98361a 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Caches/CppFileLocationPersistentCache.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Caches/CppFileLocationPersistentCache.cs
+@@ -78,6 +78,10 @@ public class CppFileLocationPersistentCache<TData> : AbstractPersistentCache<Cpp
+ 		myMarshallingContext = new CppMarshallingContext(logger);
+ 		myPsiServices = psiServices;
+ 		myLogger = logger;
++		if (formatVersion == CppGlobalSymbolCache.CACHE_FORMAT_VERSION_ORIGINAL) // @MOD C++/CX
++		{
++			FormatVersion = CppGlobalSymbolCache.CACHE_FORMAT_VERSION_CX;
++		}
+ 	}
+ 
+ 	protected override bool IsKeyValid(CppFileLocation file)

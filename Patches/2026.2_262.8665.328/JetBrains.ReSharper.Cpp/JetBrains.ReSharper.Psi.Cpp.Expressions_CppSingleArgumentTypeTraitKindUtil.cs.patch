@@ -1,0 +1,17 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Expressions/CppSingleArgumentTypeTraitKindUtil.cs b/JetBrains.ReSharper.Psi.Cpp.Expressions/CppSingleArgumentTypeTraitKindUtil.cs
+index 8607cb1b82b284a4f5dfdf327abbe43d8d7cd541..8fdd46780675d89d9c65b1cbb9800ce47a5880bf 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Expressions/CppSingleArgumentTypeTraitKindUtil.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Expressions/CppSingleArgumentTypeTraitKindUtil.cs
+@@ -80,6 +80,12 @@ public static class CppSingleArgumentTypeTraitKindUtil
+ 		Add(CppTokenNodeTypes.__IS_FLOATING_POINT, CppSingleArgumentTypeTraitKind.IS_FLOATING_POINT);
+ 		Add(CppTokenNodeTypes.__IS_IMPLICIT_LIFETIME, CppSingleArgumentTypeTraitKind.IS_IMPLICIT_LIFETIME);
+ 		Add(CppTokenNodeTypes.__IS_STRUCTURAL, CppSingleArgumentTypeTraitKind.IS_STRUCTURAL);
++
++		// @MOD C++/CX
++		Add(CppTokenNodeTypes.__IS_WIN_CLASS, CppSingleArgumentTypeTraitKind.IS_WIN_CLASS);
++		Add(CppTokenNodeTypes.__IS_WIN_INTERFACE, CppSingleArgumentTypeTraitKind.IS_WIN_INTERFACE);
++		Add(CppTokenNodeTypes.__IS_WINRT_AGILE, CppSingleArgumentTypeTraitKind.IS_WINRT_AGILE);
++		Add(CppTokenNodeTypes.__IS_VALID_WINRT_TYPE, CppSingleArgumentTypeTraitKind.IS_VALID_WINRT_TYPE);
+ 		static void Add(TokenNodeType token, CppSingleArgumentTypeTraitKind kind)
+ 		{
+ 			ourTokenToKind.Add(token, kind);

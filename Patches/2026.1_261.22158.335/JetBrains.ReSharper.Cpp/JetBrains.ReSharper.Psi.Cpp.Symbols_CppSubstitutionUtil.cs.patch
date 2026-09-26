@@ -1,0 +1,16 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppSubstitutionUtil.cs b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppSubstitutionUtil.cs
+index 33ecbf8b8d0c9a9c18492f59b7cfc409d12c8fca..d807f0b2f42c8d27a46a51c0150bab037f54ac07 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppSubstitutionUtil.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppSubstitutionUtil.cs
+@@ -142,7 +142,10 @@ public static class CppSubstitutionUtil
+ 			if (cppSubstitutionId != null)
+ 			{
+ 				CppClassTemplateResolveEntityPack packByTemplateClass = e.GetPackByTemplateClass();
+-				if (packByTemplateClass.GetPrimaryTemplate(in tc.ViewPos).Name.CastToTemplateId().Parameters is CppGenericParameters)
++				// @MOD C++/CX: native template instances (notably Platform arrays) can
++				// contain an enclosing generic's parameters too; substitute their arguments.
++				if (packByTemplateClass.GetPrimaryTemplate(in tc.ViewPos).Name.CastToTemplateId().Parameters is CppGenericParameters
++					|| cppSubstitutionId.Arguments.GetDependentInfo().IsGenericDependent())
+ 				{
+ 					CppList<ICppTemplateArgument> cppList = new CppSubstitutionDriver(subst.Reinstate(), in tc).SubstituteTemplateArguments(cppSubstitutionId.Arguments);
+ 					return CppDoSubstituteResult<ICppClassOrUndeterminedSpecializationResolveEntity>.Ok(packByTemplateClass.InstantiateClassTemplate(in tc.ViewPos, cppList));

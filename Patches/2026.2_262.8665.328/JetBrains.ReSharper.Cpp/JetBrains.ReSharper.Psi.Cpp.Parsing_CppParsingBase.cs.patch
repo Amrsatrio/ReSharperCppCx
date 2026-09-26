@@ -1,0 +1,349 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Parsing/CppParsingBase.cs b/JetBrains.ReSharper.Psi.Cpp.Parsing/CppParsingBase.cs
+index 077ac47add3069011204269fd866919eb58d21dd..37d8d8e324f50c6e7e31d48a407b5bbff8b481a3 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Parsing/CppParsingBase.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Parsing/CppParsingBase.cs
+@@ -641,7 +641,20 @@ internal abstract class CppParsingBase<TTraits, TMarkerGuard> : CppParsingWithTr
+ 			{
+ 				CppBuilderPool builderPool = parsing.GetBuilderPool();
+ 				CppNullDeclarationBuilder cppNullDeclarationBuilder = builderPool.AllocNullDeclarationBuilder(myBuilder.Parent, needTypename: false, createParameters: false);
+-				parsing.ParseAttributeSpecifierSeq(null, AllowedAttributeTypes.BOTH, cppNullDeclarationBuilder);
++				// @MOD C++/CX: base attributes are token lists, not base-type references.
++				// Match CLI attribute parsing without introducing attribute type resolution.
++				while (true)
++				{
++					parsing.ParseAttributeSpecifierSeq(null, AllowedAttributeTypes.BOTH, cppNullDeclarationBuilder);
++					if (parsing.GetLanguageKind() != CppLanguageKind.CppCx || parsing.Tt() != CppLexerTokenNodeTypes.LBRACKET || parsing.NextTt() == CppLexerTokenNodeTypes.LBRACKET)
++					{
++						break;
++					}
++					using (parsing.CreateMarkerGuard(CppCompositeNodeTypes.MS_ATTRIBUTES, beforeWs: true))
++					{
++						parsing.ParseValidParenthesisSequence<CppParserTokenSequence>();
++					}
++				}
+ 				builderPool.FreeNullDeclarationBuilder(cppNullDeclarationBuilder);
+ 				while (true)
+ 				{
+@@ -1729,6 +1742,12 @@ internal abstract class CppParsingBase<TTraits, TMarkerGuard> : CppParsingWithTr
+ 			return ParseUnaryExpression(greaterIsOperator, isRequiresClause, ref builder);
+ 		}
+ 
++		// @MOD C++/CX
++		private bool IsCxRefNew(TokenNodeType token)
++		{
++			return myParsing.myLanguage.LanguageKind == CppLanguageKind.CppCx && token == CppLexerTokenNodeTypes.IDENTIFIER && TokenText() == "ref" && NextTt() == CppTokenNodeTypes.NEW_KEYWORD;
++		}
++
+ 		public bool ParseUnaryExpression(bool greaterIsOperator, bool isRequiresClause, ref TExpressionBuilder builder)
+ 		{
+ 			TokenNodeType tokenNodeType = Tt();
+@@ -2005,7 +2024,7 @@ internal abstract class CppParsingBase<TTraits, TMarkerGuard> : CppParsingWithTr
+ 		{
+ 			if (tt != CppTokenNodeTypes.NEW_KEYWORD && (tt != CppLexerTokenNodeTypes.COLON2X || NextTt() != CppTokenNodeTypes.NEW_KEYWORD))
+ 			{
+-				return tt == CppTokenNodeTypes.CXXCLI_GCNEW_KEYWORD;
++				return tt == CppTokenNodeTypes.CXXCLI_GCNEW_KEYWORD || IsCxRefNew(tt) /*@MOD C++/CX*/;
+ 			}
+ 			return true;
+ 		}
+@@ -2013,16 +2032,32 @@ internal abstract class CppParsingBase<TTraits, TMarkerGuard> : CppParsingWithTr
+ 		public bool ParseNewExpression(bool greaterIsOperator, bool isRequiresClause, ref TExpressionBuilder builder)
+ 		{
+ 			TokenNodeType tokenNodeType = Tt();
++			bool cxRefNew = IsCxRefNew(tokenNodeType); // @MOD C++/CX
+ 			using (myParsing.CreateMarkerGuard(CppCompositeNodeTypes.CPP_NEW_EXPRESSION, beforeWs: true))
+ 			{
+-				bool flag = Tt() == CppLexerTokenNodeTypes.COLON2X;
+-				if (flag)
++				bool flag;
++				if (cxRefNew)
++				{
++					// @MOD C++/CX
++					flag = false;
++
++					// Mark the contextual `ref` token as the managed-new marker.
++					myParsing.GetOrResetTerminalTtAndAlter(CppTokenNodeTypes.CXXCLI_REF_KEYWORD, "ref", 1);
++
++					// Tt() is now NEW_KEYWORD.
++					Advance(); // consume `new`
++				}
++				else
+ 				{
++					flag = Tt() == CppLexerTokenNodeTypes.COLON2X;
++					if (flag)
++					{
++						Advance();
++					}
+ 					Advance();
+ 				}
+-				Advance();
+ 				TNewExpressionBuilder builder2 = builder.CreateNewExpressionBuilder();
+-				bool gcn = tokenNodeType == CppTokenNodeTypes.CXXCLI_GCNEW_KEYWORD;
++				bool gcn = tokenNodeType == CppTokenNodeTypes.CXXCLI_GCNEW_KEYWORD || cxRefNew /*@MOD C++/CX*/;
+ 				builder2.LearnIsCliGCNew(gcn);
+ 				builder2.LearnIsFromGlobalNamespace(flag);
+ 				if (Tt() == CppLexerTokenNodeTypes.LPAR && !myParsing.IsTypeIdInParenNotFunctionArgumentList())
+@@ -2585,7 +2620,7 @@ internal abstract class CppParsingBase<TTraits, TMarkerGuard> : CppParsingWithTr
+ 						expressionGuard.Imbue(CppCompositeNodeTypes.CALL_EXPRESSION, beforeWs: true);
+ 						return ParseCallExpression(ref builder, cppUnresolvedDeclarationSpecifierTypeBuilder);
+ 					}
+-					if (myParsing.myLanguage.LanguageKind == CppLanguageKind.CppCli && tt == CppLexerTokenNodeTypes.COLON2X)
++					if (myParsing.myLanguage.LanguageKind is CppLanguageKind.CppCli or CppLanguageKind.CppCx /* @MOD C++/CX */ && tt == CppLexerTokenNodeTypes.COLON2X)
+ 					{
+ 						myParsing.EnablePreprocessor2Detection(value: false);
+ 						flag = false;
+@@ -2873,7 +2908,7 @@ internal abstract class CppParsingBase<TTraits, TMarkerGuard> : CppParsingWithTr
+ 			{
+ 				Advance();
+ 				qualifierGuard.Close(CppCompositeNodeTypes.NAME_QUALIFIER, beforeWs: false);
+-				if (myParsing.myLanguage.LanguageKind == CppLanguageKind.CppCli && Tt() == CppTokenNodeTypes.TYPEID_KEYWORD)
++				if (myParsing.myLanguage.LanguageKind is CppLanguageKind.CppCli or CppLanguageKind.CppCx /* @MOD C++/CX */ && Tt() == CppTokenNodeTypes.TYPEID_KEYWORD)
+ 				{
+ 					Advance();
+ 					expressionGuard.Close(CppCompositeNodeTypes.CLI_TYPEID_EXPRESSION, beforeWs: false);
+@@ -5590,6 +5625,20 @@ internal abstract class CppParsingBase<TTraits, TMarkerGuard> : CppParsingWithTr
+ 		return true;
+ 	}
+ 
++	// @MOD C++/CX
++	private bool IsCxPartialClassSpecifier(TokenNodeType token)
++	{
++		if (myLanguage.LanguageKind != CppLanguageKind.CppCx || token != CppLexerTokenNodeTypes.IDENTIFIER || TokenText() != "partial")
++		{
++			return false;
++		}
++		using (CreateRollbackDetectionModeGuard())
++		{
++			Advance();
++			return Tt() == CppLexerTokenNodeTypes.IDENTIFIER && TokenText() == "ref" && NextTt() == CppTokenNodeTypes.CLASS_KEYWORD;
++		}
++	}
++
+ 	private bool IsClassSpecifier(TokenNodeType token)
+ 	{
+ 		if (token == CppTokenNodeTypes.STRUCT_KEYWORD || token == CppTokenNodeTypes.CLASS_KEYWORD || token == CppTokenNodeTypes.UNION_KEYWORD || token == CppTokenNodeTypes.ENUM_KEYWORD || token == CppTokenNodeTypes.__INTERFACE_KEYWORD || token == CppTokenNodeTypes.HLSL_INTERFACE_KEYWORD || IsUE4ClassAttribute(token))
+@@ -5605,6 +5654,10 @@ internal abstract class CppParsingBase<TTraits, TMarkerGuard> : CppParsingWithTr
+ 					Advance();
+ 					token = Tt();
+ 				}
++				if (IsCxPartialClassSpecifier(token)) // @MOD C++/CX
++				{
++					return true;
++				}
+ 				if (token == CppTokenNodeTypes.STRUCT_KEYWORD || token == CppTokenNodeTypes.CLASS_KEYWORD || token == CppTokenNodeTypes.UNION_KEYWORD || token == CppTokenNodeTypes.ENUM_KEYWORD || token == CppTokenNodeTypes.__INTERFACE_KEYWORD || token == CppTokenNodeTypes.HLSL_INTERFACE_KEYWORD)
+ 				{
+ 					return true;
+@@ -7135,7 +7188,7 @@ internal abstract class CppParsingBase<TTraits, TMarkerGuard> : CppParsingWithTr
+ 			}
+ 			return ParseDeclarationWithSpecifiersGreedyResult.ERROR;
+ 		}
+-		if (myDetectionMode && myLanguage.LanguageKind == CppLanguageKind.CppCli && IsStatement(parseType) && parseDeclarationSpecifiersResult.typeType == ParseDeclarationSpecifiersResult.TypeType.SIMPLE_TYPE_SPECIFIER && !parseDeclarationSpecifiersResult.hadDeclSpecifiers && Tt() == CppLexerTokenNodeTypes.COLON2X)
++		if (myDetectionMode && myLanguage.LanguageKind is CppLanguageKind.CppCli or CppLanguageKind.CppCx /*@MOD C++/CX*/ && IsStatement(parseType) && parseDeclarationSpecifiersResult.typeType == ParseDeclarationSpecifiersResult.TypeType.SIMPLE_TYPE_SPECIFIER && !parseDeclarationSpecifiersResult.hadDeclSpecifiers && Tt() == CppLexerTokenNodeTypes.COLON2X)
+ 		{
+ 			return ParseDeclarationWithSpecifiersGreedyResult.ERROR;
+ 		}
+@@ -8307,7 +8360,7 @@ internal abstract class CppParsingBase<TTraits, TMarkerGuard> : CppParsingWithTr
+ 		Advance();
+ 		if (Tt() == CppLexerTokenNodeTypes.IDENTIFIER)
+ 		{
+-			if (myLanguage.LanguageKind == CppLanguageKind.CppCli && TokenText() == "internal")
++			if (myLanguage.LanguageKind is CppLanguageKind.CppCli or CppLanguageKind.CppCx /*@MOD C++/CX*/ && TokenText() == "internal")
+ 			{
+ 				Advance();
+ 				if (Tt() == CppLexerTokenNodeTypes.COLON)
+@@ -9361,7 +9414,7 @@ internal abstract class CppParsingBase<TTraits, TMarkerGuard> : CppParsingWithTr
+ 
+ 	public bool IsCxxCliPropertyOrEvent()
+ 	{
+-		if (myLanguage.LanguageKind != CppLanguageKind.CppCli)
++		if (!(myLanguage.LanguageKind is CppLanguageKind.CppCli or CppLanguageKind.CppCx) /*@MOD C++/CX*/)
+ 		{
+ 			return false;
+ 		}
+@@ -9475,7 +9528,7 @@ internal abstract class CppParsingBase<TTraits, TMarkerGuard> : CppParsingWithTr
+ 
+ 	public bool IsCxxCliDelegate()
+ 	{
+-		if (myLanguage.LanguageKind != CppLanguageKind.CppCli)
++		if (!(myLanguage.LanguageKind is CppLanguageKind.CppCli or CppLanguageKind.CppCx) /*@MOD C++/CX*/)
+ 		{
+ 			return false;
+ 		}
+@@ -10077,7 +10130,7 @@ internal abstract class CppParsingBase<TTraits, TMarkerGuard> : CppParsingWithTr
+ 
+ 	public bool IsCxxCliOverrideSpecifier()
+ 	{
+-		if (myLanguage.LanguageKind != CppLanguageKind.CppCli)
++		if (!(myLanguage.LanguageKind is CppLanguageKind.CppCli or CppLanguageKind.CppCx) /*@MOD C++/CX*/)
+ 		{
+ 			return false;
+ 		}
+@@ -10245,14 +10298,14 @@ internal abstract class CppParsingBase<TTraits, TMarkerGuard> : CppParsingWithTr
+ 			CppAttributeList replaced = default(CppAttributeList);
+ 			foreach (ICppAttribute unresolved2 in attributeListBuilder.GetUnresolvedList())
+ 			{
+-				if (unresolved2.GetName().Equals(CppAttribute.RSCppAlignAsName))
++				if (unresolved2.GetName().Equals(CppAttribute.RSCppAlignAsName) || (myLanguage.LanguageKind == CppLanguageKind.CppCx && unresolved2.GetName().Equals(CppAttribute.CxMarshalingBehaviorName)) /* @MOD C++/CX */)
+ 				{
+ 					unresolved.Add(unresolved2);
+ 				}
+ 			}
+ 			foreach (ICppAttribute replaced2 in attributeListBuilder.GetReplacedList())
+ 			{
+-				if (replaced2.GetName().Equals(CppAttribute.RSCppAlignAsName))
++				if (replaced2.GetName().Equals(CppAttribute.RSCppAlignAsName) || (myLanguage.LanguageKind == CppLanguageKind.CppCx && replaced2.GetName().Equals(CppAttribute.CxMarshalingBehaviorName)) /* @MOD C++/CX */)
+ 				{
+ 					replaced.Add(replaced2);
+ 				}
+@@ -10662,6 +10715,12 @@ internal abstract class CppParsingBase<TTraits, TMarkerGuard> : CppParsingWithTr
+ 	public void ParseClassKey(ref CppClassKeyBuilder keyBuilder)
+ 	{
+ 		TokenNodeType tokenNodeType = Tt();
++		if (IsCxPartialClassSpecifier(tokenNodeType)) // @MOD C++/CX
++		{
++			GetOrResetTerminalTtAndAlter(CppTokenNodeTypes.CXXCX_PARTIAL_KEYWORD, "partial", 1);
++			keyBuilder.LearnToken(CppTokenNodeTypes.CXXCX_PARTIAL_KEYWORD); // @MOD C++/CX
++			tokenNodeType = Tt();
++		}
+ 		if (tokenNodeType == CppTokenNodeTypes.CLASS_KEYWORD || tokenNodeType == CppTokenNodeTypes.STRUCT_KEYWORD || tokenNodeType == CppTokenNodeTypes.UNION_KEYWORD || tokenNodeType == CppTokenNodeTypes.__INTERFACE_KEYWORD || tokenNodeType == CppTokenNodeTypes.HLSL_INTERFACE_KEYWORD)
+ 		{
+ 			keyBuilder.LearnToken(tokenNodeType);
+@@ -10750,7 +10809,7 @@ internal abstract class CppParsingBase<TTraits, TMarkerGuard> : CppParsingWithTr
+ 	{
+ 		if (tt != CppTokenNodeTypes.PRIVATE_KEYWORD && tt != CppTokenNodeTypes.PROTECTED_KEYWORD && tt != CppTokenNodeTypes.PUBLIC_KEYWORD)
+ 		{
+-			if (myLanguage.LanguageKind == CppLanguageKind.CppCli && tt == CppLexerTokenNodeTypes.IDENTIFIER && TokenText() == "internal")
++			if (myLanguage.LanguageKind is CppLanguageKind.CppCli or CppLanguageKind.CppCx /*@MOD C++/CX*/ && tt == CppLexerTokenNodeTypes.IDENTIFIER && TokenText() == "internal")
+ 			{
+ 				return NextTt() == CppLexerTokenNodeTypes.COLON;
+ 			}
+@@ -10774,7 +10833,7 @@ internal abstract class CppParsingBase<TTraits, TMarkerGuard> : CppParsingWithTr
+ 			tt = CppTokenNodeTypes.CXXCLI_INTERNAL_KEYWORD;
+ 		}
+ 		CppAccessibility result;
+-		if (myLanguage.LanguageKind == CppLanguageKind.CppCli)
++		if (myLanguage.LanguageKind is CppLanguageKind.CppCli or CppLanguageKind.CppCx /*@MOD C++/CX*/)
+ 		{
+ 			TokenNodeType tokenNodeType = Tt();
+ 			if (tokenNodeType == CppTokenNodeTypes.PRIVATE_KEYWORD || tokenNodeType == CppTokenNodeTypes.PROTECTED_KEYWORD || tokenNodeType == CppTokenNodeTypes.PUBLIC_KEYWORD || tokenNodeType == CppTokenNodeTypes.CXXCLI_INTERNAL_KEYWORD)
+@@ -10789,6 +10848,12 @@ internal abstract class CppParsingBase<TTraits, TMarkerGuard> : CppParsingWithTr
+ 					Advance();
+ 					result = CppAccessibility.PROTECTED;
+ 				}
++				else if (myLanguage.LanguageKind == CppLanguageKind.CppCx && tt == CppTokenNodeTypes.PRIVATE_KEYWORD && tokenNodeType == CppTokenNodeTypes.PUBLIC_KEYWORD)
++				{
++					// @MOD C++/CX: `private public` == `internal`
++					Advance();
++					result = CppAccessibility.PUBLIC;
++				}
+ 				else
+ 				{
+ 					Advance();
+@@ -10962,7 +11027,7 @@ internal abstract class CppParsingBase<TTraits, TMarkerGuard> : CppParsingWithTr
+ 				}
+ 				return false;
+ 			}
+-			if (myLanguage.LanguageKind == CppLanguageKind.CppCli && (tokenNodeType == CppLexerTokenNodeTypes.XOR || tokenNodeType == CppLexerTokenNodeTypes.PERC))
++			if (myLanguage.LanguageKind is CppLanguageKind.CppCli or CppLanguageKind.CppCx /*@MOD C++/CX*/ && (tokenNodeType == CppLexerTokenNodeTypes.XOR || tokenNodeType == CppLexerTokenNodeTypes.PERC))
+ 			{
+ 				return true;
+ 			}
+@@ -11770,7 +11835,14 @@ internal abstract class CppParsingBase<TTraits, TMarkerGuard> : CppParsingWithTr
+ 	{
+ 		using (CreateMarkerGuard(CppCompositeNodeTypes.MS_ATTRIBUTES, beforeWs: true))
+ 		{
+-			ParseValidParenthesisSequence<CppParserTokenSequence>();
++			if (myLanguage.LanguageKind == CppLanguageKind.CppCx) // @MOD C++/CX
++			{
++				ParseCxMsAttributeList(declBuilder);
++			}
++			else
++			{
++				ParseValidParenthesisSequence<CppParserTokenSequence>();
++			}
+ 		}
+ 		if (IsAttributeSpecifier())
+ 		{
+@@ -11782,6 +11854,82 @@ internal abstract class CppParsingBase<TTraits, TMarkerGuard> : CppParsingWithTr
+ 		ParseTopLevelDeclarationOrShowError(allowOmittingType, parseType, Strings.Parser_Error_ExpectedDeclaration_Text, declBuilder, in aspParent, ref mkParent);
+ 	}
+ 
++	// @MOD C++/CX
++	private void ParseCxMsAttributeList(ICppDeclarationBuilder declBuilder)
++	{
++		Advance();
++		ICppAttributeListBuilder attributes = null;
++		while (Tt() != null && Tt() != CppLexerTokenNodeTypes.RBRACKET)
++		{
++			if (Tt() == CppLexerTokenNodeTypes.COLON2X)
++			{
++				Advance();
++			}
++			string qualifier = null;
++			string name = ParseAttributeNamePart();
++			if (name == null)
++			{
++				ContinueParsingValidParenthesisSequence<CppParserTokenSequence>(CppLexerTokenNodeTypes.LBRACKET);
++				break;
++			}
++			Advance();
++			while (Tt() == CppLexerTokenNodeTypes.COLON2X)
++			{
++				qualifier = qualifier == null ? name : qualifier + "::" + name;
++				Advance();
++				name = ParseAttributeNamePart();
++				if (name == null)
++				{
++					break;
++				}
++				Advance();
++			}
++			bool isMarshalingBehavior = (name == "MarshalingBehavior" || name == "MarshalingBehaviorAttribute") && (qualifier == null || qualifier == CppAttribute.CxMarshalingBehaviorName.Qualifier);
++			if (isMarshalingBehavior && !myDetectionMode)
++			{
++				attributes ??= declBuilder.CreateAttributesBuilder();
++				CppAttributeWithExpressionArgumentBuilder argumentBuilder = new CppAttributeWithExpressionArgumentBuilder();
++				bool parsed = false;
++				if (Tt() == CppLexerTokenNodeTypes.LPAR)
++				{
++					Advance();
++					if (argumentBuilder.LearnArgs(new CppAttributeArgumentsParser(this, declBuilder)) &&
++					    ExpectToken(CppLexerTokenNodeTypes.RPAR, "Parser_Error_ExpectedRPar_Text"))
++					{
++						attributes.LearnAttribute(CppAttribute.CxMarshalingBehaviorName, argumentBuilder);
++						parsed = true;
++					}
++					else
++					{
++						ContinueParsingValidParenthesisSequence<CppParserTokenSequence>(CppLexerTokenNodeTypes.LPAR);
++					}
++				}
++				if (!parsed)
++				{
++					attributes.LearnAttributeConstant(CppAttribute.Create(CppAttribute.CxMarshalingBehaviorName));
++				}
++			}
++			else if (Tt() == CppLexerTokenNodeTypes.LPAR)
++			{
++				ParseValidParenthesisSequence<CppParserTokenSequence>();
++			}
++			if (Tt() != CppLexerTokenNodeTypes.COMMA)
++			{
++				ContinueParsingValidParenthesisSequence<CppParserTokenSequence>(CppLexerTokenNodeTypes.LBRACKET);
++				break;
++			}
++			Advance();
++		}
++		if (Tt() == CppLexerTokenNodeTypes.RBRACKET)
++		{
++			Advance();
++		}
++		if (attributes != null)
++		{
++			declBuilder.LearnAttributes(attributes);
++		}
++	}
++
+ 	public void ParseValidParenthesisSequence<TTokenSequence>() where TTokenSequence : struct, ICppParserTokenSequence
+ 	{
+ 		TTokenSequence val = new TTokenSequence();

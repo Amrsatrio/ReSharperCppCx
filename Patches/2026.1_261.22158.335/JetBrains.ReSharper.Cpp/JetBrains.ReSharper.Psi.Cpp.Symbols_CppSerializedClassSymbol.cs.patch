@@ -1,0 +1,13 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppSerializedClassSymbol.cs b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppSerializedClassSymbol.cs
+index 663efd86d2ef91dd4049f93cb49c3392f64645a2..a786dd20b1501986d8a436e702515bf301113cdf 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppSerializedClassSymbol.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppSerializedClassSymbol.cs
+@@ -7,6 +7,8 @@ internal struct CppSerializedClassSymbol
+ {
+ 	public const int Size = 19;
+ 
++	internal const byte CxPartialFlag = 8; // @MOD C++/CX: spare bit; preserve the 19-byte layout.
++
+ 	public CppSerializedSymbolLocation Location;
+ 
+ 	public CppModuleNameIndex Name;

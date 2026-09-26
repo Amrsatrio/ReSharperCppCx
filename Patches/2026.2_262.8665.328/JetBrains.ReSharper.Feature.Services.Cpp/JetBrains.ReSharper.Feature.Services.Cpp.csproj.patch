@@ -1,0 +1,392 @@
+diff --git a/JetBrains.ReSharper.Feature.Services.Cpp.csproj b/JetBrains.ReSharper.Feature.Services.Cpp.csproj
+index 381044ba9fcd4f68e3e9061055c4e20497d3f536..1082a9a9a22eb2bdfafa7c6ebf488ec6a4a7c14e 100644
+--- a/JetBrains.ReSharper.Feature.Services.Cpp.csproj
++++ b/JetBrains.ReSharper.Feature.Services.Cpp.csproj
+@@ -1,193 +1,194 @@
+-<Project Sdk="Microsoft.NET.Sdk">
+-  <PropertyGroup>
+-    <AssemblyName>JetBrains.ReSharper.Feature.Services.Cpp</AssemblyName>
+-    <GenerateAssemblyInfo>False</GenerateAssemblyInfo>
+-    <TargetFramework>net48</TargetFramework>
+-    <SignAssembly>true</SignAssembly>
+-    <PublicSign>true</PublicSign>
+-    <AssemblyOriginatorKeyFile>JetBrains.ReSharper.PublicKey.snk</AssemblyOriginatorKeyFile>
+-  </PropertyGroup>
+-  <PropertyGroup>
+-    <LangVersion>13.0</LangVersion>
+-    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+-    <CheckForOverflowUnderflow>False</CheckForOverflowUnderflow>
+-  </PropertyGroup>
+-  <PropertyGroup>
+-    <RootNamespace />
+-  </PropertyGroup>
+-  <ItemDefinitionGroup>
+-    <Reference>
+-      <Private>false</Private>
+-    </Reference>
+-  </ItemDefinitionGroup>
+-  <ItemGroup>
+-    <None Remove="JetBrains.ReSharper.Feature.Services.Cpp.Src.Caches.standard.c" />
+-    <None Remove="JetBrains.ReSharper.Feature.Services.Cpp.Src.Caches.standard.cpp" />
+-    <None Remove="JetBrains.ReSharper.Feature.Services.Cpp.Src.Caches.UE4_generated_header.h" />
+-    <None Remove="JetBrains.ReSharper.Feature.Services.Cpp.Src.Caches.UE53_generated_header.h" />
+-    <None Remove="JetBrains.ReSharper.Feature.Services.Cpp.Src.Caches.UE57_generated_header.h" />
+-    <None Remove="JetBrains.ReSharper.Feature.Services.Cpp.Src.Caches.UE58_generated_header.h" />
+-    <None Remove="JetBrains.ReSharper.Feature.Services.Cpp.Src.LiveTemplates.Settings.FileTemplates.xml" />
+-    <None Remove="JetBrains.ReSharper.Feature.Services.Cpp.Src.LiveTemplates.Settings.LiveTemplates.xml" />
+-    <None Remove="JetBrains.ReSharper.Feature.Services.Cpp.Src.LiveTemplates.Settings.SurroundTemplates.xml" />
+-    <None Remove="JetBrains.ReSharper.Feature.Services.Cpp.Src.LiveTemplates.Settings.UnrealFileTemplates.xml" />
+-    <None Remove="JetBrains.ReSharper.Feature.Services.Cpp.Src.LiveTemplates.Settings.UnrealLiveTemplates.xml" />
+-    <EmbeddedResource Include="JetBrains.ReSharper.Feature.Services.Cpp.Src.Caches.standard.c" LogicalName="JetBrains.ReSharper.Feature.Services.Cpp.Src.Caches.standard.c" />
+-    <EmbeddedResource Include="JetBrains.ReSharper.Feature.Services.Cpp.Src.Caches.standard.cpp" LogicalName="JetBrains.ReSharper.Feature.Services.Cpp.Src.Caches.standard.cpp" />
+-    <EmbeddedResource Include="JetBrains.ReSharper.Feature.Services.Cpp.Src.Caches.UE4_generated_header.h" LogicalName="JetBrains.ReSharper.Feature.Services.Cpp.Src.Caches.UE4_generated_header.h" />
+-    <EmbeddedResource Include="JetBrains.ReSharper.Feature.Services.Cpp.Src.Caches.UE53_generated_header.h" LogicalName="JetBrains.ReSharper.Feature.Services.Cpp.Src.Caches.UE53_generated_header.h" />
+-    <EmbeddedResource Include="JetBrains.ReSharper.Feature.Services.Cpp.Src.Caches.UE57_generated_header.h" LogicalName="JetBrains.ReSharper.Feature.Services.Cpp.Src.Caches.UE57_generated_header.h" />
+-    <EmbeddedResource Include="JetBrains.ReSharper.Feature.Services.Cpp.Src.Caches.UE58_generated_header.h" LogicalName="JetBrains.ReSharper.Feature.Services.Cpp.Src.Caches.UE58_generated_header.h" />
+-    <EmbeddedResource Include="JetBrains.ReSharper.Feature.Services.Cpp.Src.LiveTemplates.Settings.FileTemplates.xml" LogicalName="JetBrains.ReSharper.Feature.Services.Cpp.Src.LiveTemplates.Settings.FileTemplates.xml" />
+-    <EmbeddedResource Include="JetBrains.ReSharper.Feature.Services.Cpp.Src.LiveTemplates.Settings.LiveTemplates.xml" LogicalName="JetBrains.ReSharper.Feature.Services.Cpp.Src.LiveTemplates.Settings.LiveTemplates.xml" />
+-    <EmbeddedResource Include="JetBrains.ReSharper.Feature.Services.Cpp.Src.LiveTemplates.Settings.SurroundTemplates.xml" LogicalName="JetBrains.ReSharper.Feature.Services.Cpp.Src.LiveTemplates.Settings.SurroundTemplates.xml" />
+-    <EmbeddedResource Include="JetBrains.ReSharper.Feature.Services.Cpp.Src.LiveTemplates.Settings.UnrealFileTemplates.xml" LogicalName="JetBrains.ReSharper.Feature.Services.Cpp.Src.LiveTemplates.Settings.UnrealFileTemplates.xml" />
+-    <EmbeddedResource Include="JetBrains.ReSharper.Feature.Services.Cpp.Src.LiveTemplates.Settings.UnrealLiveTemplates.xml" LogicalName="JetBrains.ReSharper.Feature.Services.Cpp.Src.LiveTemplates.Settings.UnrealLiveTemplates.xml" />
+-  </ItemGroup>
+-  <ItemGroup>
+-    <Reference Include="JetBrains.ReSharper.Feature.Services">
+-      <HintPath>..\..\References\JetBrains.ReSharper.Feature.Services.dll</HintPath>
+-    </Reference>
+-    <Reference Include="JetBrains.ReSharper.Resources">
+-      <HintPath>..\..\References\JetBrains.ReSharper.Resources.dll</HintPath>
+-    </Reference>
+-    <Reference Include="JetBrains.Platform.Shell">
+-      <HintPath>..\..\References\JetBrains.Platform.Shell.dll</HintPath>
+-    </Reference>
+-    <Reference Include="JetBrains.ReSharper.Psi">
+-      <HintPath>..\..\References\JetBrains.ReSharper.Psi.dll</HintPath>
+-    </Reference>
+-    <Reference Include="JetBrains.Annotations">
+-      <HintPath>..\..\References\JetBrains.Annotations.dll</HintPath>
+-    </Reference>
+-    <ProjectReference Include="..\..\JetBrains.ReSharper.Cpp\Source\JetBrains.ReSharper.Cpp.csproj" />
+-    <Reference Include="JetBrains.Platform.ComponentModel">
+-      <HintPath>..\..\References\JetBrains.Platform.ComponentModel.dll</HintPath>
+-    </Reference>
+-    <Reference Include="JetBrains.Platform.ProjectModel">
+-      <HintPath>..\..\References\JetBrains.Platform.ProjectModel.dll</HintPath>
+-    </Reference>
+-    <Reference Include="JetBrains.Platform.DocumentManager">
+-      <HintPath>..\..\References\JetBrains.Platform.DocumentManager.dll</HintPath>
+-    </Reference>
+-    <Reference Include="JetBrains.Lifetimes">
+-      <HintPath>..\..\References\JetBrains.Lifetimes.dll</HintPath>
+-    </Reference>
+-    <Reference Include="JetBrains.Platform.TextControl">
+-      <HintPath>..\..\References\JetBrains.Platform.TextControl.dll</HintPath>
+-    </Reference>
+-    <Reference Include="JetBrains.Platform.DocumentModel">
+-      <HintPath>..\..\References\JetBrains.Platform.DocumentModel.dll</HintPath>
+-    </Reference>
+-    <Reference Include="JetBrains.Platform.Util">
+-      <HintPath>..\..\References\JetBrains.Platform.Util.dll</HintPath>
+-    </Reference>
+-    <Reference Include="JetBrains.Platform.Core">
+-      <HintPath>..\..\References\JetBrains.Platform.Core.dll</HintPath>
+-    </Reference>
+-    <Reference Include="System.Core" />
+-    <Reference Include="JetBrains.Platform.Metadata">
+-      <HintPath>..\..\References\JetBrains.Platform.Metadata.dll</HintPath>
+-    </Reference>
+-    <Reference Include="JetBrains.Platform.Text.Protocol">
+-      <HintPath>..\..\References\JetBrains.Platform.Text.Protocol.dll</HintPath>
+-    </Reference>
+-    <Reference Include="JetBrains.HabitatDetector">
+-      <HintPath>..\..\References\JetBrains.HabitatDetector.dll</HintPath>
+-    </Reference>
+-    <Reference Include="JetBrains.UsageStatistics">
+-      <HintPath>..\..\References\JetBrains.UsageStatistics.dll</HintPath>
+-    </Reference>
+-    <Reference Include="JetBrains.Platform.ProjectModel.Host">
+-      <HintPath>..\..\References\JetBrains.Platform.ProjectModel.Host.dll</HintPath>
+-    </Reference>
+-    <Reference Include="JetBrains.ReSharper.Features.Environment">
+-      <HintPath>..\..\References\JetBrains.ReSharper.Features.Environment.dll</HintPath>
+-    </Reference>
+-    <Reference Include="JetBrains.ReSharper.Psi.CSharp">
+-      <HintPath>..\..\References\JetBrains.ReSharper.Psi.CSharp.dll</HintPath>
+-    </Reference>
+-    <Reference Include="Newtonsoft.Json">
+-      <HintPath>..\..\References\Newtonsoft.Json.dll</HintPath>
+-    </Reference>
+-    <Reference Include="JetBrains.ReSharper.Daemon.Engine">
+-      <HintPath>..\..\References\JetBrains.ReSharper.Daemon.Engine.dll</HintPath>
+-    </Reference>
+-    <Reference Include="JetBrains.Platform.RdProtocol">
+-      <HintPath>..\..\References\JetBrains.Platform.RdProtocol.dll</HintPath>
+-    </Reference>
+-    <Reference Include="System.Memory">
+-      <HintPath>..\..\References\System.Memory.dll</HintPath>
+-    </Reference>
+-    <Reference Include="System.Xml" />
+-    <Reference Include="NuGet.Versioning">
+-      <HintPath>..\..\References\NuGet.Versioning.dll</HintPath>
+-    </Reference>
+-    <Reference Include="JetBrains.Platform.Ide">
+-      <HintPath>..\..\References\JetBrains.Platform.Ide.dll</HintPath>
+-    </Reference>
+-    <Reference Include="JetBrains.ReSharper.Features.Navigation">
+-      <HintPath>..\..\References\JetBrains.ReSharper.Features.Navigation.dll</HintPath>
+-    </Reference>
+-    <Reference Include="JetBrains.ReSharper.InplaceRefactorings">
+-      <HintPath>..\..\References\JetBrains.ReSharper.InplaceRefactorings.dll</HintPath>
+-    </Reference>
+-    <Reference Include="JetBrains.ReSharper.NewRefactorings">
+-      <HintPath>..\..\References\JetBrains.ReSharper.NewRefactorings.dll</HintPath>
+-    </Reference>
+-    <Reference Include="JetBrains.ReSharper.Daemon.Specific">
+-      <HintPath>..\..\References\JetBrains.ReSharper.Daemon.Specific.dll</HintPath>
+-    </Reference>
+-    <Reference Include="JetBrains.ReSharper.Intentions">
+-      <HintPath>..\..\References\JetBrains.ReSharper.Intentions.dll</HintPath>
+-    </Reference>
+-    <Reference Include="JetBrains.Platform.Interop">
+-      <HintPath>..\..\References\JetBrains.Platform.Interop.dll</HintPath>
+-    </Reference>
+-    <Reference Include="JetBrains.ICSharpCode.SharpZipLib">
+-      <HintPath>..\..\References\JetBrains.ICSharpCode.SharpZipLib.dll</HintPath>
+-    </Reference>
+-    <Reference Include="YamlDotNet">
+-      <HintPath>..\..\References\YamlDotNet.dll</HintPath>
+-    </Reference>
+-    <Reference Include="System.ComponentModel.DataAnnotations" />
+-    <Reference Include="JetBrains.ReSharper.Feature.Services.CSharp">
+-      <HintPath>..\..\References\JetBrains.ReSharper.Feature.Services.CSharp.dll</HintPath>
+-    </Reference>
+-    <Reference Include="System.Xml.Linq" />
+-    <Reference Include="JetBrains.Platform.Util.Text">
+-      <HintPath>..\..\References\JetBrains.Platform.Util.Text.dll</HintPath>
+-    </Reference>
+-    <Reference Include="JetBrains.ReSharper.Features.Inspections">
+-      <HintPath>..\..\References\JetBrains.ReSharper.Features.Inspections.dll</HintPath>
+-    </Reference>
+-    <Reference Include="JetBrains.ReSharper.Features.Internal">
+-      <HintPath>..\..\References\JetBrains.ReSharper.Features.Internal.dll</HintPath>
+-    </Reference>
+-    <Reference Include="JetBrains.ReSharper.Daemon">
+-      <HintPath>..\..\References\JetBrains.ReSharper.Daemon.dll</HintPath>
+-    </Reference>
+-    <Reference Include="JetBrains.ReSharper.Features.ReSpeller">
+-      <HintPath>..\..\References\JetBrains.ReSharper.Features.ReSpeller.dll</HintPath>
+-    </Reference>
+-    <Reference Include="JetBrains.ReSharper.Features.Intellisense">
+-      <HintPath>..\..\References\JetBrains.ReSharper.Features.Intellisense.dll</HintPath>
+-    </Reference>
+-    <Reference Include="System.Collections.Immutable">
+-      <HintPath>..\..\References\System.Collections.Immutable.dll</HintPath>
+-    </Reference>
+-    <Reference Include="JetBrains.Platform.Util.NetFX">
+-      <HintPath>..\..\References\JetBrains.Platform.Util.NetFX.dll</HintPath>
+-    </Reference>
+-    <Reference Include="WindowsBase" />
+-    <Reference Include="JetBrains.RdFramework">
+-      <HintPath>..\..\References\JetBrains.RdFramework.dll</HintPath>
+-    </Reference>
+-    <Reference Include="JetBrains.ReSharper.LiveTemplates">
+-      <HintPath>..\..\References\JetBrains.ReSharper.LiveTemplates.dll</HintPath>
+-    </Reference>
+-    <Reference Include="JetBrains.ReSharper.Features.Altering">
+-      <HintPath>..\..\References\JetBrains.ReSharper.Features.Altering.dll</HintPath>
+-    </Reference>
+-  </ItemGroup>
+-</Project>
++<Project Sdk="Microsoft.NET.Sdk">
++  <PropertyGroup>
++    <AssemblyName>JetBrains.ReSharper.Feature.Services.Cpp</AssemblyName>
++    <GenerateAssemblyInfo>False</GenerateAssemblyInfo>
++    <TargetFramework>net48</TargetFramework>
++    <SignAssembly>true</SignAssembly>
++    <PublicSign>true</PublicSign>
++    <AssemblyOriginatorKeyFile>JetBrains.ReSharper.PublicKey.snk</AssemblyOriginatorKeyFile>
++  </PropertyGroup>
++  <PropertyGroup>
++    <LangVersion>13.0</LangVersion>
++    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
++    <CheckForOverflowUnderflow>False</CheckForOverflowUnderflow>
++  </PropertyGroup>
++  <PropertyGroup>
++    <RootNamespace />
++  </PropertyGroup>
++  <ItemDefinitionGroup>
++    <Reference>
++      <Private>false</Private>
++    </Reference>
++  </ItemDefinitionGroup>
++  <ItemGroup>
++    <None Remove="JetBrains.ReSharper.Feature.Services.Cpp.Src.Caches.standard.c" />
++    <None Remove="JetBrains.ReSharper.Feature.Services.Cpp.Src.Caches.standard.cpp" />
++    <None Remove="JetBrains.ReSharper.Feature.Services.Cpp.Src.Caches.UE4_generated_header.h" />
++    <None Remove="JetBrains.ReSharper.Feature.Services.Cpp.Src.Caches.UE53_generated_header.h" />
++    <None Remove="JetBrains.ReSharper.Feature.Services.Cpp.Src.Caches.UE57_generated_header.h" />
++    <None Remove="JetBrains.ReSharper.Feature.Services.Cpp.Src.Caches.UE58_generated_header.h" />
++    <None Remove="JetBrains.ReSharper.Feature.Services.Cpp.Src.LiveTemplates.Settings.FileTemplates.xml" />
++    <None Remove="JetBrains.ReSharper.Feature.Services.Cpp.Src.LiveTemplates.Settings.LiveTemplates.xml" />
++    <None Remove="JetBrains.ReSharper.Feature.Services.Cpp.Src.LiveTemplates.Settings.SurroundTemplates.xml" />
++    <None Remove="JetBrains.ReSharper.Feature.Services.Cpp.Src.LiveTemplates.Settings.UnrealFileTemplates.xml" />
++    <None Remove="JetBrains.ReSharper.Feature.Services.Cpp.Src.LiveTemplates.Settings.UnrealLiveTemplates.xml" />
++    <EmbeddedResource Include="JetBrains.ReSharper.Feature.Services.Cpp.Src.Caches.standard.c" LogicalName="JetBrains.ReSharper.Feature.Services.Cpp.Src.Caches.standard.c" />
++    <EmbeddedResource Include="JetBrains.ReSharper.Feature.Services.Cpp.Src.Caches.standard.cpp" LogicalName="JetBrains.ReSharper.Feature.Services.Cpp.Src.Caches.standard.cpp" />
++    <EmbeddedResource Include="JetBrains.ReSharper.Feature.Services.Cpp.Src.Caches.UE4_generated_header.h" LogicalName="JetBrains.ReSharper.Feature.Services.Cpp.Src.Caches.UE4_generated_header.h" />
++    <EmbeddedResource Include="JetBrains.ReSharper.Feature.Services.Cpp.Src.Caches.UE53_generated_header.h" LogicalName="JetBrains.ReSharper.Feature.Services.Cpp.Src.Caches.UE53_generated_header.h" />
++    <EmbeddedResource Include="JetBrains.ReSharper.Feature.Services.Cpp.Src.Caches.UE57_generated_header.h" LogicalName="JetBrains.ReSharper.Feature.Services.Cpp.Src.Caches.UE57_generated_header.h" />
++    <EmbeddedResource Include="JetBrains.ReSharper.Feature.Services.Cpp.Src.Caches.UE58_generated_header.h" LogicalName="JetBrains.ReSharper.Feature.Services.Cpp.Src.Caches.UE58_generated_header.h" />
++    <EmbeddedResource Include="JetBrains.ReSharper.Feature.Services.Cpp.Src.LiveTemplates.Settings.FileTemplates.xml" LogicalName="JetBrains.ReSharper.Feature.Services.Cpp.Src.LiveTemplates.Settings.FileTemplates.xml" />
++    <EmbeddedResource Include="JetBrains.ReSharper.Feature.Services.Cpp.Src.LiveTemplates.Settings.LiveTemplates.xml" LogicalName="JetBrains.ReSharper.Feature.Services.Cpp.Src.LiveTemplates.Settings.LiveTemplates.xml" />
++    <EmbeddedResource Include="JetBrains.ReSharper.Feature.Services.Cpp.Src.LiveTemplates.Settings.SurroundTemplates.xml" LogicalName="JetBrains.ReSharper.Feature.Services.Cpp.Src.LiveTemplates.Settings.SurroundTemplates.xml" />
++    <EmbeddedResource Include="JetBrains.ReSharper.Feature.Services.Cpp.Src.LiveTemplates.Settings.UnrealFileTemplates.xml" LogicalName="JetBrains.ReSharper.Feature.Services.Cpp.Src.LiveTemplates.Settings.UnrealFileTemplates.xml" />
++    <EmbeddedResource Include="JetBrains.ReSharper.Feature.Services.Cpp.Src.LiveTemplates.Settings.UnrealLiveTemplates.xml" LogicalName="JetBrains.ReSharper.Feature.Services.Cpp.Src.LiveTemplates.Settings.UnrealLiveTemplates.xml" />
++  </ItemGroup>
++  <ItemGroup>
++    <Reference Include="JetBrains.ReSharper.Feature.Services">
++      <HintPath>..\..\References\JetBrains.ReSharper.Feature.Services.dll</HintPath>
++    </Reference>
++    <Reference Include="JetBrains.ReSharper.Resources">
++      <HintPath>..\..\References\JetBrains.ReSharper.Resources.dll</HintPath>
++    </Reference>
++    <Reference Include="JetBrains.Platform.Shell">
++      <HintPath>..\..\References\JetBrains.Platform.Shell.dll</HintPath>
++    </Reference>
++    <Reference Include="JetBrains.ReSharper.Psi">
++      <HintPath>..\..\References\JetBrains.ReSharper.Psi.dll</HintPath>
++    </Reference>
++    <Reference Include="JetBrains.Annotations">
++      <HintPath>..\..\References\JetBrains.Annotations.dll</HintPath>
++    </Reference>
++    <ProjectReference Include="..\..\JetBrains.ReSharper.Cpp\Source\JetBrains.ReSharper.Cpp.csproj" />
++    <Reference Include="JetBrains.Platform.ComponentModel">
++      <HintPath>..\..\References\JetBrains.Platform.ComponentModel.dll</HintPath>
++    </Reference>
++    <Reference Include="JetBrains.Platform.ProjectModel">
++      <HintPath>..\..\References\JetBrains.Platform.ProjectModel.dll</HintPath>
++    </Reference>
++    <Reference Include="JetBrains.Platform.DocumentManager">
++      <HintPath>..\..\References\JetBrains.Platform.DocumentManager.dll</HintPath>
++    </Reference>
++    <Reference Include="JetBrains.Lifetimes">
++      <HintPath>..\..\References\JetBrains.Lifetimes.dll</HintPath>
++    </Reference>
++    <Reference Include="JetBrains.Platform.TextControl">
++      <HintPath>..\..\References\JetBrains.Platform.TextControl.dll</HintPath>
++    </Reference>
++    <Reference Include="JetBrains.Platform.DocumentModel">
++      <HintPath>..\..\References\JetBrains.Platform.DocumentModel.dll</HintPath>
++    </Reference>
++    <Reference Include="JetBrains.Platform.Util">
++      <HintPath>..\..\References\JetBrains.Platform.Util.dll</HintPath>
++    </Reference>
++    <Reference Include="JetBrains.Platform.Core">
++      <HintPath>..\..\References\JetBrains.Platform.Core.dll</HintPath>
++    </Reference>
++    <Reference Include="PresentationCore" /> <!--@MOD Fix compile; System.Windows.Markup.IAddChild-related errors-->
++    <Reference Include="System.Core" />
++    <Reference Include="JetBrains.Platform.Metadata">
++      <HintPath>..\..\References\JetBrains.Platform.Metadata.dll</HintPath>
++    </Reference>
++    <Reference Include="JetBrains.Platform.Text.Protocol">
++      <HintPath>..\..\References\JetBrains.Platform.Text.Protocol.dll</HintPath>
++    </Reference>
++    <Reference Include="JetBrains.HabitatDetector">
++      <HintPath>..\..\References\JetBrains.HabitatDetector.dll</HintPath>
++    </Reference>
++    <Reference Include="JetBrains.UsageStatistics">
++      <HintPath>..\..\References\JetBrains.UsageStatistics.dll</HintPath>
++    </Reference>
++    <Reference Include="JetBrains.Platform.ProjectModel.Host">
++      <HintPath>..\..\References\JetBrains.Platform.ProjectModel.Host.dll</HintPath>
++    </Reference>
++    <Reference Include="JetBrains.ReSharper.Features.Environment">
++      <HintPath>..\..\References\JetBrains.ReSharper.Features.Environment.dll</HintPath>
++    </Reference>
++    <Reference Include="JetBrains.ReSharper.Psi.CSharp">
++      <HintPath>..\..\References\JetBrains.ReSharper.Psi.CSharp.dll</HintPath>
++    </Reference>
++    <Reference Include="Newtonsoft.Json">
++      <HintPath>..\..\References\Newtonsoft.Json.dll</HintPath>
++    </Reference>
++    <Reference Include="JetBrains.ReSharper.Daemon.Engine">
++      <HintPath>..\..\References\JetBrains.ReSharper.Daemon.Engine.dll</HintPath>
++    </Reference>
++    <Reference Include="JetBrains.Platform.RdProtocol">
++      <HintPath>..\..\References\JetBrains.Platform.RdProtocol.dll</HintPath>
++    </Reference>
++    <Reference Include="System.Memory">
++      <HintPath>..\..\References\System.Memory.dll</HintPath>
++    </Reference>
++    <Reference Include="System.Xml" />
++    <Reference Include="NuGet.Versioning">
++      <HintPath>..\..\References\NuGet.Versioning.dll</HintPath>
++    </Reference>
++    <Reference Include="JetBrains.Platform.Ide">
++      <HintPath>..\..\References\JetBrains.Platform.Ide.dll</HintPath>
++    </Reference>
++    <Reference Include="JetBrains.ReSharper.Features.Navigation">
++      <HintPath>..\..\References\JetBrains.ReSharper.Features.Navigation.dll</HintPath>
++    </Reference>
++    <Reference Include="JetBrains.ReSharper.InplaceRefactorings">
++      <HintPath>..\..\References\JetBrains.ReSharper.InplaceRefactorings.dll</HintPath>
++    </Reference>
++    <Reference Include="JetBrains.ReSharper.NewRefactorings">
++      <HintPath>..\..\References\JetBrains.ReSharper.NewRefactorings.dll</HintPath>
++    </Reference>
++    <Reference Include="JetBrains.ReSharper.Daemon.Specific">
++      <HintPath>..\..\References\JetBrains.ReSharper.Daemon.Specific.dll</HintPath>
++    </Reference>
++    <Reference Include="JetBrains.ReSharper.Intentions">
++      <HintPath>..\..\References\JetBrains.ReSharper.Intentions.dll</HintPath>
++    </Reference>
++    <Reference Include="JetBrains.Platform.Interop">
++      <HintPath>..\..\References\JetBrains.Platform.Interop.dll</HintPath>
++    </Reference>
++    <Reference Include="JetBrains.ICSharpCode.SharpZipLib">
++      <HintPath>..\..\References\JetBrains.ICSharpCode.SharpZipLib.dll</HintPath>
++    </Reference>
++    <Reference Include="YamlDotNet">
++      <HintPath>..\..\References\YamlDotNet.dll</HintPath>
++    </Reference>
++    <Reference Include="System.ComponentModel.DataAnnotations" />
++    <Reference Include="JetBrains.ReSharper.Feature.Services.CSharp">
++      <HintPath>..\..\References\JetBrains.ReSharper.Feature.Services.CSharp.dll</HintPath>
++    </Reference>
++    <Reference Include="System.Xml.Linq" />
++    <Reference Include="JetBrains.Platform.Util.Text">
++      <HintPath>..\..\References\JetBrains.Platform.Util.Text.dll</HintPath>
++    </Reference>
++    <Reference Include="JetBrains.ReSharper.Features.Inspections">
++      <HintPath>..\..\References\JetBrains.ReSharper.Features.Inspections.dll</HintPath>
++    </Reference>
++    <Reference Include="JetBrains.ReSharper.Features.Internal">
++      <HintPath>..\..\References\JetBrains.ReSharper.Features.Internal.dll</HintPath>
++    </Reference>
++    <Reference Include="JetBrains.ReSharper.Daemon">
++      <HintPath>..\..\References\JetBrains.ReSharper.Daemon.dll</HintPath>
++    </Reference>
++    <Reference Include="JetBrains.ReSharper.Features.ReSpeller">
++      <HintPath>..\..\References\JetBrains.ReSharper.Features.ReSpeller.dll</HintPath>
++    </Reference>
++    <Reference Include="JetBrains.ReSharper.Features.Intellisense">
++      <HintPath>..\..\References\JetBrains.ReSharper.Features.Intellisense.dll</HintPath>
++    </Reference>
++    <Reference Include="System.Collections.Immutable">
++      <HintPath>..\..\References\System.Collections.Immutable.dll</HintPath>
++    </Reference>
++    <Reference Include="JetBrains.Platform.Util.NetFX">
++      <HintPath>..\..\References\JetBrains.Platform.Util.NetFX.dll</HintPath>
++    </Reference>
++    <Reference Include="WindowsBase" />
++    <Reference Include="JetBrains.RdFramework">
++      <HintPath>..\..\References\JetBrains.RdFramework.dll</HintPath>
++    </Reference>
++    <Reference Include="JetBrains.ReSharper.LiveTemplates">
++      <HintPath>..\..\References\JetBrains.ReSharper.LiveTemplates.dll</HintPath>
++    </Reference>
++    <Reference Include="JetBrains.ReSharper.Features.Altering">
++      <HintPath>..\..\References\JetBrains.ReSharper.Features.Altering.dll</HintPath>
++    </Reference>
++  </ItemGroup>
++</Project>

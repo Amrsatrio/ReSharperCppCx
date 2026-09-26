@@ -1,0 +1,64 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClassOrEnumData.cs b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClassOrEnumData.cs
+index ce36f987ddc79425be274f353c8aecbaf9597f0b..5f1c8460e66bd642e5ee48331f0b43dc80819a99 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClassOrEnumData.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClassOrEnumData.cs
+@@ -399,6 +399,23 @@ public abstract class CppClassOrEnumData : CppType
+ 
+ 	public abstract bool IsVisible();
+ 
++	// @MOD C++/CX
++	public bool HasCxPartialDeclarations()
++	{
++		if (!myClassKey.IsCliClassOrInterface())
++		{
++			return false;
++		}
++		foreach (ClassPartDescription part in myParts)
++		{
++			if (CppClassSymbolUtil.IsCxPartial(part.Symbol))
++			{
++				return true;
++			}
++		}
++		return false;
++	}
++
+ 	public virtual bool HasDefinition()
+ 	{
+ 		if (myParts.Count == 0)
+@@ -406,6 +423,11 @@ public abstract class CppClassOrEnumData : CppType
+ 			return false;
+ 		}
+ 		ICppClassOrDelegateSymbolOrModuleEntity symbol = myParts[0].Symbol;
++		// @MOD C++/CX: a partial body declares the type but does not define it.
++		if (CppClassSymbolUtil.IsCxPartial(symbol))
++		{
++			return false;
++		}
+ 		if (symbol is CppClassOrEnumModuleEntity cppClassOrEnumModuleEntity)
+ 		{
+ 			return cppClassOrEnumModuleEntity.HasDefinition;
+@@ -419,6 +441,11 @@ public abstract class CppClassOrEnumData : CppType
+ 		{
+ 			return null;
+ 		}
++		// @MOD C++/CX
++		if (CppClassSymbolUtil.IsCxPartial(myParts[0].Symbol))
++		{
++			return null;
++		}
+ 		return myParts[0].Symbol as ICppDefinitionClassSymbol;
+ 	}
+ 
+@@ -440,6 +467,11 @@ public abstract class CppClassOrEnumData : CppType
+ 			}
+ 			if (sym is CppClassSymbol)
+ 			{
++				// @MOD C++/CX: bases from every body are looked up at the final definition.
++				if (HasDefinition() && HasCxPartialDeclarations())
++				{
++					return new CppViewPos(lookupParent, myDefinitionLocationAnchor.Next, templateParametersIfTemplateId, templateParametersMapping);
++				}
+ 				CppLocationAnchor anchor = myPart.Anchor;
+ 				return new CppViewPos(lookupParent, anchor.Next, templateParametersIfTemplateId, templateParametersMapping);
+ 			}

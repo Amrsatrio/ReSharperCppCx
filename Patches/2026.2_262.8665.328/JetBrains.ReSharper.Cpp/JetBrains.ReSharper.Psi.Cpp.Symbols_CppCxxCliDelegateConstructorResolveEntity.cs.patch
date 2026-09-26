@@ -1,0 +1,85 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppCxxCliDelegateConstructorResolveEntity.cs b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppCxxCliDelegateConstructorResolveEntity.cs
+index 48e7bcf94f9e170e3e9c92d611be72670ccc9b8e..91a16469021f3eb04e0b56f6661674a2f2da4a87 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppCxxCliDelegateConstructorResolveEntity.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppCxxCliDelegateConstructorResolveEntity.cs
+@@ -2,6 +2,7 @@ using System;
+ using System.Collections.Generic;
+ using System.Linq;
+ using JetBrains.ReSharper.Psi.Cpp.Expressions;
++using JetBrains.ReSharper.Psi.Cpp.Language; // @MOD C++/CX
+ using JetBrains.ReSharper.Psi.Cpp.Types;
+ 
+ namespace JetBrains.ReSharper.Psi.Cpp.Symbols;
+@@ -15,7 +16,8 @@ public class CppCxxCliDelegateConstructorResolveEntity : ICppRawDeclaratorResolv
+ 		GLOBAL_FUNC_STDCALL,
+ 		REF_CLASS_MEMBER_FUNC,
+ 		VALUE_CLASS_MEMBER_FUNC,
+-		THIS_ARG_MEMBER_FUNC
++		THIS_ARG_MEMBER_FUNC,
++		CX_LAMBDA // @MOD C++/CX
+ 	}
+ 
+ 	private static class CliDelegateConstructor
+@@ -108,13 +110,20 @@ public class CppCxxCliDelegateConstructorResolveEntity : ICppRawDeclaratorResolv
+ 	public virtual CppQualType ResolveType(ICppResolvedTypeFactory tf)
+ 	{
+ 		CppQualType cppType = ((ICppDeclaratorResolveEntity)((ICppDeclaratorResolveEntityPack)myParent.ChildByName(CppOperatorId.Create(CppOperatorKind.PAREN), myParent.GetEndLocationAnchor())[0]).GetGroupedEntities().Single()).GetCppType(tf);
++		// @MOD C++/CX
++		bool isCx = tf.GetDialect().LanguageKind == CppLanguageKind.CppCx;
++		CppCallingConvention invokeConvention = isCx ? cppType.GetCallingConvention() : CppCallingConvention.CLRCALL;
+ 		CppQualType[] paramTypes = null;
+ 		switch (ConstructorType)
+ 		{
++		case CtorType.CX_LAMBDA: // @MOD C++/CX
++			// Keep this compiler-generated callable candidate distinct from the CLI function-pointer constructors. // @MOD C++/CX
++			paramTypes = new CppQualType[] { tf.GetReferenceType(cppType, ReferenceFlag.Lval) };
++			break;
+ 		case CtorType.GLOBAL_FUNC_CLRCALL:
+ 		{
+ 			bool changed3 = false;
+-			cppType = cppType.ChangeCallingConvention(CppCallingConvention.CLRCALL, CppDecoratedCallingConvention.EXPLICIT_CLRCALL, tf, ref changed3);
++			cppType = cppType.ChangeCallingConvention(invokeConvention, CppDecoratedCallingConvention.EXPLICIT_CLRCALL, tf, ref changed3); // @MOD C++/CX
+ 			paramTypes = new CppQualType[1]
+ 			{
+ 				new CppQualType(tf.GetPointerType(cppType))
+@@ -124,7 +133,7 @@ public class CppCxxCliDelegateConstructorResolveEntity : ICppRawDeclaratorResolv
+ 		case CtorType.GLOBAL_FUNC_CDECL:
+ 		{
+ 			bool changed2 = false;
+-			cppType = cppType.ChangeCallingConvention(CppCallingConvention.CLRCALL, CppDecoratedCallingConvention.EXPLICIT_CDECL, tf, ref changed2);
++			cppType = cppType.ChangeCallingConvention(invokeConvention, CppDecoratedCallingConvention.EXPLICIT_CDECL, tf, ref changed2); // @MOD C++/CX
+ 			paramTypes = new CppQualType[1]
+ 			{
+ 				new CppQualType(tf.GetPointerType(cppType))
+@@ -134,7 +143,7 @@ public class CppCxxCliDelegateConstructorResolveEntity : ICppRawDeclaratorResolv
+ 		case CtorType.GLOBAL_FUNC_STDCALL:
+ 		{
+ 			bool changed = false;
+-			cppType = cppType.ChangeCallingConvention(CppCallingConvention.CLRCALL, CppDecoratedCallingConvention.EXPLICIT_STDCALL, tf, ref changed);
++			cppType = cppType.ChangeCallingConvention(invokeConvention, CppDecoratedCallingConvention.EXPLICIT_STDCALL, tf, ref changed); // @MOD C++/CX
+ 			paramTypes = new CppQualType[1]
+ 			{
+ 				new CppQualType(tf.GetPointerType(cppType))
+@@ -177,7 +186,9 @@ public class CppCxxCliDelegateConstructorResolveEntity : ICppRawDeclaratorResolv
+ 			{
+ 				cppQualType = cppQualType.GetCliHandlePointeeType();
+ 			}
+-			CppQualType functionType = tf.GetFunctionType(cppType.GetFunctionReturnType(), array, new CppFunctionFlags(cppType.GetEllipsisKind(), CppDecoratedCallingConvention.EXPLICIT_CLRCALL, CppRestrictionSpecifiers.Cpu, FuncRefQualifier.Empty));
++			// @MOD C++/CX
++			CppDecoratedCallingConvention memberConvention = isCx ? tf.GetDialect().DefaultMemberCallingConvention.DecorateAsImplicit() : CppDecoratedCallingConvention.EXPLICIT_CLRCALL;
++			CppQualType functionType = tf.GetFunctionType(cppType.GetFunctionReturnType(), array, new CppFunctionFlags(cppType.GetEllipsisKind(), memberConvention, CppRestrictionSpecifiers.Cpu, FuncRefQualifier.Empty));
+ 			paramTypes = new CppQualType[1]
+ 			{
+ 				new CppQualType(tf.GetMemberPointerType(cppQualType, functionType))
+@@ -185,6 +196,10 @@ public class CppCxxCliDelegateConstructorResolveEntity : ICppRawDeclaratorResolv
+ 			break;
+ 		}
+ 		}
+-		return tf.GetFunctionType(CppQualType.EmptyType(), paramTypes, new CppFunctionFlags(CppEllipsisKind.None, CppDecoratedCallingConvention.EXPLICIT_CLRCALL, CliDelegateConstructor.RestrictionSpecifiers, FuncRefQualifier.Empty));
++		// @MOD C++/CX
++		CppDecoratedCallingConvention convention = isCx
++			? new CppDecoratedCallingConvention(false, tf.GetDialect().DefaultCtorDtorCallingConvention)
++			: CppDecoratedCallingConvention.EXPLICIT_CLRCALL;
++		return tf.GetFunctionType(CppQualType.EmptyType(), paramTypes, new CppFunctionFlags(CppEllipsisKind.None, convention, CliDelegateConstructor.RestrictionSpecifiers, FuncRefQualifier.Empty));
+ 	}
+ }

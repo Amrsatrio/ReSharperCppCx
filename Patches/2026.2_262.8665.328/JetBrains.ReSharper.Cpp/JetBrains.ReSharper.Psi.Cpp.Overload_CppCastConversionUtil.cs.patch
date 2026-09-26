@@ -1,0 +1,32 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Overload/CppCastConversionUtil.cs b/JetBrains.ReSharper.Psi.Cpp.Overload/CppCastConversionUtil.cs
+index 557ebc93b4a2cfa5c3da17db5bdff0b7b92eaf0d..5b6bb6162939c35b083f830b7bb8fb869e8ff032 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Overload/CppCastConversionUtil.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Overload/CppCastConversionUtil.cs
+@@ -24,6 +24,13 @@ public static class CppCastConversionUtil
+ 
+ 		public CppCastConversion DoSafeCast(CppExpressionInfo from, CppQualType toT)
+ 		{
++			// @MOD C++/CX: a checked cast cannot construct a bare ref class/interface.
++			// Keep dynamic_cast's target error instead of trying constructor conversions.
++			if (myTypeContext.Factory.GetDialect().LanguageKind == CppLanguageKind.CppCx
++				&& (toT.IsCliRefClassType() || toT.IsCliInterfaceType()))
++			{
++				return new CppDynamicCastBadConversion(from.Expression, from.Type, toT, CppDynamicCastBadConversion.FailureKind.BadTargetTypeNonClass);
++			}
+ 			myCastType = CppConversionParameters.CastKind.CliSafeCast;
+ 			CppCastConversion cppCastConversion = DoDynamicCast(from, toT);
+ 			if (cppCastConversion.IsFailure())
+@@ -560,6 +567,13 @@ public static class CppCastConversionUtil
+ 			{
+ 				return new CppReinterpretCastSucceededConversion(from.Expression, typeAndCategory.Type, cppQualType);
+ 			}
++			if (myTypeContext.Factory.GetDialect().LanguageKind == CppLanguageKind.CppCx) // @MOD C++/CX
++			{
++				if ((from.Type.IsPointer() && toT.IsCliHandle()) || (from.Type.IsCliHandle() && toT.IsPointer()))
++				{
++					return new CppReinterpretCastSucceededConversion(from.Expression, typeAndCategory.Type, cppQualType);
++				}
++			}
+ 			if (from.Type.IsMemberPointer() && toT.IsMemberPointer())
+ 			{
+ 				CppQualType memberPointeeType = from.Type.GetMemberPointeeType();

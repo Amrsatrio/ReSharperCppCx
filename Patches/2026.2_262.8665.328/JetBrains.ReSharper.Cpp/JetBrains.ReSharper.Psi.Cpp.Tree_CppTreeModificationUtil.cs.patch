@@ -1,0 +1,297 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Tree/CppTreeModificationUtil.cs b/JetBrains.ReSharper.Psi.Cpp.Tree/CppTreeModificationUtil.cs
+index 1f185efa09c58cd6121ac3014bd03a175ab61b9f..0bc3dbe59f6a2bab443ec3235904e59cc841605d 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Tree/CppTreeModificationUtil.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Tree/CppTreeModificationUtil.cs
+@@ -8,10 +8,292 @@ using JetBrains.ReSharper.Psi.ExtensionsAPI.Tree;
+ using JetBrains.ReSharper.Psi.Tree;
+ using JetBrains.ReSharper.Resources.Shell;
+ 
++// @MOD C++/CX Imports
++using JetBrains.ReSharper.Psi.Cpp.Expressions;
++using JetBrains.ReSharper.Psi.Cpp.Overload;
++using JetBrains.ReSharper.Psi.Cpp.Presentation;
++using JetBrains.ReSharper.Psi.Cpp.Language;
++using JetBrains.ReSharper.Psi.Cpp.Symbols;
++using JetBrains.ReSharper.Psi.Cpp.Types;
++using JetBrains.ReSharper.Psi.ExtensionsAPI;
++
+ namespace JetBrains.ReSharper.Psi.Cpp.Tree;
+ 
+ public static class CppTreeModificationUtil
+ {
++	// @MOD C++/CX: only a public, unsealed ref-class base permits an exported unsealed class.
++	public static string GetCxPublicRefClassDeclarationError(ITreeNode declaration)
++	{
++		if (declaration is not ClassSpecifier classSpecifier || !classSpecifier.IsValid()
++			|| classSpecifier.GetLanguageDialect().LanguageKind != CppLanguageKind.CppCx
++			|| classSpecifier.LBrace == null || classSpecifier.RBrace == null
++			|| CppClassSymbolUtil.IsCxPartial(classSpecifier.GetClassSymbol()))
++		{
++			return null;
++		}
++		ICppClassResolveEntity entity = classSpecifier.GetClassResolveEntity();
++		if (entity == null || !entity.HasDefinition() || !entity.GetKey().IsCliRefClass()
++			|| entity.GetAccessibility() != CppAccessibility.PUBLIC || entity.IsFinalOrSealed()
++			|| entity.GetLookupParent() is not CppNamespaceResolveEntity)
++		{
++			return null;
++		}
++		// Unlike GetNonDependentBases(), GetBases() retains unresolved bases and includes
++		// base clauses contributed by partial declarations once the final body is present.
++		foreach (CppBasicBaseDescription<CppQualType> baseDescription in entity.GetBases())
++		{
++			CppQualType baseType = baseDescription.Entity();
++			if (baseType.GetDependentInfo().IsTypeOrUnknownDependent())
++			{
++				return null;
++			}
++			ICppClassResolveEntity baseClass = baseType.GetResolvedClassTypeEntity();
++			if (baseClass == null || !baseClass.HasDefinition())
++			{
++				return null;
++			}
++			// Platform::Object is the projected root, not a composable base class.
++			if (baseClass.GetKey().IsCliRefClass() && !baseClass.IsSystemObject()
++				&& baseClass.GetAccessibility() == CppAccessibility.PUBLIC && !baseClass.IsFinalOrSealed())
++			{
++				return null;
++			}
++		}
++		return "A public C++/CX ref class must be sealed or derive from an existing public unsealed ref class (C4585)";
++	}
++
++	// @MOD C++/CX: IDisposable projection does not make the source keyword optional.
++	public static bool IsCxPublicDestructor(ICppNonAbstractDeclaratorNode declarator)
++	{
++		ICppClassResolveEntity owner = GetCxDestructorOwner(declarator);
++		return owner != null && GetCxDestructorAccess(declarator, owner) == 4;
++	}
++
++	// @MOD C++/CX: Keep the declared spelling, not inherited/implicit virtualness.
++	// Access flags retain combinations that the three-valued symbol accessibility loses.
++	public static string GetCxDestructorDeclarationError(ICppNonAbstractDeclaratorNode declarator)
++	{
++		ICppClassResolveEntity owner = GetCxDestructorOwner(declarator);
++		if (owner == null)
++		{
++			return null;
++		}
++		int access = GetCxDestructorAccess(declarator, owner);
++		bool isVirtual = DeclarationNavigator.GetByDeclarator(declarator)?.DeclarationSpecifiersNode.VirtualSpecifierNode != null;
++		if (isVirtual)
++		{
++			return access == 4 ? null : "A virtual C++/CX destructor must have public accessibility (C2031)";
++		}
++		if (access != 1 && access != 3)
++		{
++			return access == 4
++				? "A public C++/CX destructor must be explicitly declared virtual (C2035)"
++				: "A non-virtual C++/CX destructor must have private or protected private accessibility (C2035)";
++		}
++		// MSVC also permits private non-virtual destructors on unsealed types.
++		return access == 3 && owner.IsFinalOrSealed()
++			? "A non-virtual destructor of a sealed C++/CX type must have private accessibility (C2030)"
++			: null;
++	}
++
++	private static ICppClassResolveEntity GetCxDestructorOwner(ICppNonAbstractDeclaratorNode declarator)
++	{
++		if (declarator == null || !declarator.IsValid() || declarator.GetLanguageDialect().LanguageKind != CppLanguageKind.CppCx)
++		{
++			return null;
++		}
++		ICppDeclaratorResolveEntity entity = declarator.GetResolveEntity();
++		if (entity == null || !entity.IsDestructorDeclarator() || !entity.IsNonFriendDeclaratorInClassScope())
++		{
++			return null;
++		}
++		ICppClassResolveEntity owner = entity.GetClassByMember();
++		return owner != null && owner.GetKey().IsCliRefClass() ? owner : null;
++	}
++
++	private static int GetCxDestructorAccess(ICppNonAbstractDeclaratorNode declarator, ICppClassResolveEntity owner)
++	{
++		for (ITreeNode node = declarator; node != null && node is not ClassSpecifier; node = node.Parent)
++		{
++			for (ITreeNode sibling = node.PrevSibling; sibling != null; sibling = sibling.PrevSibling)
++			{
++				if (sibling is not AccessSpecifier accessSpecifier)
++				{
++					continue;
++				}
++				int access = 0;
++				for (ITreeNode token = accessSpecifier.FirstChild; token != null; token = token.NextSibling)
++				{
++					if (token.NodeType == CppTokenNodeTypes.PRIVATE_KEYWORD) access |= 1;
++					else if (token.NodeType == CppTokenNodeTypes.PROTECTED_KEYWORD) access |= 2;
++					else if (token.NodeType == CppTokenNodeTypes.PUBLIC_KEYWORD) access |= 4;
++					else if (token.NodeType == CppTokenNodeTypes.CXXCLI_INTERNAL_KEYWORD) access |= 8;
++				}
++				return access;
++			}
++		}
++		return owner.GetKey() == CppClassKey.REF_STRUCT ? 4 : 1;
++	}
++
++	// @MOD C++/CX: null preserves the native/CLI quick-fix path; an empty result
++	// still suppresses unchecked handle casts when neither checked cast is valid.
++	public static string[] GetCxHandleCastSuggestions(ICppExpressionNode expression, CppQualType targetType)
++	{
++		if (expression == null || expression.GetLanguageDialect().LanguageKind != CppLanguageKind.CppCx
++			|| !targetType.ClearRefs().IsCliHandle()
++			|| !expression.GetTypeAndCategory().Type.ClearRefs().IsCliHandle())
++		{
++			return null;
++		}
++		if (!targetType.IsRef)
++		{
++			targetType = targetType.ClearCVQuals();
++		}
++		if (!targetType.CanBePresented(expression.GetResolveScope()))
++		{
++			return [];
++		}
++		var context = CppTypeContextUtil.FromPsi(expression);
++		bool safe = !CppCastConversionUtil.BuildSafeCastConversion(expression, targetType, in context).IsFailure();
++		bool dynamic = !CppCastConversionUtil.BuildDynamicCastConversion(expression, targetType, in context).IsFailure();
++		if (!safe && !dynamic)
++		{
++			return [];
++		}
++		string type = CppPresenter.CreateFromPsiWithViewPos(expression).PresentType(targetType);
++		if (safe && dynamic)
++		{
++			return ["safe_cast<" + type + ">", "dynamic_cast<" + type + ">"];
++		}
++		return [(safe ? "safe_cast<" : "dynamic_cast<") + type + ">"];
++	}
++
++	// @MOD C++/CX: shared by the checked-cast diagnostic and its missing-hat fix.
++	// ErrorElement is either the cast itself or one of its direct children.
++	public static bool IsCxCheckedCastMissingHandle(ITreeNode node)
++	{
++		CastExpression cast = GetCxCheckedCast(node);
++		if (cast?.CastTypeId == null)
++		{
++			return false;
++		}
++		CppQualType target = cast.GetQualType();
++		return target.IsCliRefClassType() || target.IsCliInterfaceType();
++	}
++
++	private static CastExpression GetCxCheckedCast(ITreeNode node)
++	{
++		CastExpression cast = node as CastExpression ?? node?.Parent as CastExpression;
++		if (cast == null || !cast.IsValid() || cast.GetLanguageDialect().LanguageKind != CppLanguageKind.CppCx)
++		{
++			return null;
++		}
++		CppCastType kind = cast.GetCastType();
++		return kind == CppCastType.SAFE_CAST || kind == CppCastType.DYNAMIC_CAST ? cast : null;
++	}
++
++	public static bool CanAddCxCheckedCastHandle(ITreeNode node)
++	{
++		if (!IsCxCheckedCastMissingHandle(node))
++		{
++			return false;
++		}
++		CastExpression cast = GetCxCheckedCast(node);
++		TypeId typeId = cast.CastTypeId;
++		if (cast.Expression == null || cast.Expression.GetDependentInfo().IsTypeOrUnknownDependent()
++			|| typeId.DeclarationSpecifiersNode == null
++			|| (typeId.TypeIdDeclarator != null && typeId.TypeIdDeclarator.GetTextLength() != 0)
++			|| !CppIsModifiableUtil.IsInsideModifiableFile(typeId)
++			|| !CppModificationUtil.CanBeReplaced(typeId, null))
++		{
++			return false;
++		}
++		var context = CppTypeContextUtil.FromPsi(cast);
++		CppQualType target = new CppQualType(context.Factory.GetCliHandleType(cast.GetQualType()));
++		CppCastConversion conversion = cast.GetCastType() == CppCastType.SAFE_CAST
++			? CppCastConversionUtil.BuildSafeCastConversion(cast.Expression, target, in context)
++			: CppCastConversionUtil.BuildDynamicCastConversion(cast.Expression, target, in context);
++		return !conversion.IsFailure();
++	}
++
++	public static void AddCxCheckedCastHandle(ITreeNode node)
++	{
++		if (!CanAddCxCheckedCastHandle(node))
++		{
++			throw new CppPsiNodeModificationException();
++		}
++		CastExpression cast = GetCxCheckedCast(node);
++		using (WriteLockCookie.Create("Src\\Tree\\Util\\CppTreeModificationUtil.cs", "AddCxCheckedCastHandle"))
++		using (DisableCodeFormatter.DisableExpensiveFormatting())
++		{
++			// Retain the original type spelling (including qualification and generic arguments).
++			// Only the abstract declarator comes from the parsed handle type.
++			CastExpression prototype = (CastExpression)CppElementFactory.GetInstance(cast.GetPsiModule())
++				.CreateExpressionWithoutPreprocessing(cast.GetLanguageDialect(), cast, "static_cast<int^>(0)");
++			TypeId replacement = prototype.CastTypeId;
++			CppModificationUtil.ReplaceChild(replacement.DeclarationSpecifiersNode, cast.CastTypeId.DeclarationSpecifiersNode);
++			CppModificationUtil.ReplaceChild(cast.CastTypeId, replacement);
++		}
++	}
++
++	// @MOD C++/CX: Called only by the patched immutability quick fix, not generic tree insertion.
++	public static ITreeNode GetCxHandleConstAnchor(ICppNonAbstractDeclaratorNode declarator)
++	{
++		if (declarator.GetLanguageDialect().LanguageKind != CppLanguageKind.CppCx)
++		{
++			return null;
++		}
++		ICppDeclaratorResolveEntity entity = declarator.GetResolveEntity();
++		if (entity == null)
++		{
++			return null;
++		}
++		CppQualType type = entity.GetCppType(declarator.GetTypeFactory());
++		if (!type.IsRef || !type.GetReferencedType().IsCliHandle())
++		{
++			return null;
++		}
++		for (NestedDeclarator nested = declarator.GetInnermostDeclarator(); nested != null; nested = CppDeclaratorNodeNavigator.GetByChildNestedDeclarator(nested) as NestedDeclarator)
++		{
++			CppList<ITreeNode> prefixes = nested.TypePrefixNodes;
++			for (int i = prefixes.Count - 1; i >= 0; --i)
++			{
++				if (prefixes[i].NodeType == CppLexerTokenNodeTypes.XOR)
++				{
++					return prefixes[i];
++				}
++			}
++		}
++		return null;
++	}
++
++	// @MOD C++/CX: Availability must check the same handle anchor used by the edit.
++	public static bool CanAddCxHandleConst(ITreeNode anchor)
++	{
++		for (ITreeNode qualifier = BaseDeclaratorNode.GetFirstCVQualifierByPointer(anchor); qualifier != null; qualifier = BaseDeclaratorNode.GetNextCVQualifier(qualifier))
++		{
++			if (CppTokenNodeTypes.CONST_KEYWORDS[qualifier.NodeType])
++			{
++				return false;
++			}
++		}
++		return CppIsModifiableUtil.IsInsideModifiableFile(anchor) && CppModificationUtil.CanBeAdded(anchor, null, CppAddChildMode.ADD_AFTER_ANCHOR);
++	}
++
++	// @MOD C++/CX: Qualify the handle before its following reference, leaving the pointee untouched.
++	public static void AddCxHandleConst(ITreeNode anchor)
++	{
++		if (!CanAddCxHandleConst(anchor))
++		{
++			throw new CppPsiNodeModificationException();
++		}
++		using (WriteLockCookie.Create("Src\\Tree\\Util\\CppTreeModificationUtil.cs", "AddCxHandleConst"))
++		using (DisableCodeFormatter.DisableExpensiveFormatting())
++		{
++			CppModificationUtil.AddChild(anchor, CppTokenNodeTypes.CONST_KEYWORD.CreateLeafElement(), CppAddChildMode.ADD_AFTER_ANCHOR);
++		}
++	}
++
+ 	public static ITreeNode GetAnchorForNewImportDirective(CppFile file, DocumentOffset? offset = null)
+ 	{
+ 		int num = 0;

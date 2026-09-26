@@ -1,0 +1,197 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClassData.cs b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClassData.cs
+index 423940f4d0f25c5d952b22f0f0b1f1f7d79535a3..cffdf74e0de370a671be4e80d9de2517153dfaa9 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClassData.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClassData.cs
+@@ -99,6 +99,13 @@ public abstract class CppClassData : CppClassOrEnumData
+ 
+ 		private readonly CppList<CppBasicBaseDescription<ICppClassResolveEntity>> oldPartialCliBases;
+ 
++		// @MOD C++/CX: source partial bodies can have populated every member cache.
++		private readonly CppDeclaratorResolveEntityPack oldCliFinalizers;
++		private readonly Dictionary<CppQualifiedNamePart, CppSmallList<ICppDeclaratorResolveEntityPack>> oldAnonymousSubclassMembers;
++		private readonly CppSmallList<CppPackExpansionType> oldFriendPacks;
++		private readonly List<ICppResolveEntity> oldSortedMembers;
++		private readonly object oldAggregateMembers;
++
+ 		public SymbolMergingReverted(CppClassData data, Dictionary<CppQualifiedNamePart, CppSmallList<ICppResolveEntity>> children, CppList<ICppClassResolveEntity> anonymousClasses, CppDeclaratorResolveEntityPack conversions, CppConstructorDeclaratorResolveEntityPack constructors, CppConstructorDeclaratorResolveEntityPack staticConstructors, CppDeclaratorResolveEntityPack destructors, Dictionary<CppQualifiedNamePart, CppSmallList<ICppFunctionDeclaratorResolveEntity>> friendFunctions, Dictionary<CppQualifiedNamePart, CppSmallList<ICppClassResolveEntity>> friendClasses, CppSmallList<ICppDependentTypeResolveEntity> friendTypes, CppList<CppBasicBaseDescription<ICppClassResolveEntity>> partialCliBases)
+ 		{
+ 			myData = data;
+@@ -112,6 +119,11 @@ public abstract class CppClassData : CppClassOrEnumData
+ 			oldFriendClasses = friendClasses;
+ 			oldFriendTypes = friendTypes;
+ 			oldPartialCliBases = partialCliBases;
++			oldCliFinalizers = data.myCliFinalizers;
++			oldAnonymousSubclassMembers = data.myAnonymousSubclassMembers;
++			oldFriendPacks = data.myFriendPacks;
++			oldSortedMembers = data.mySortedMembers;
++			oldAggregateMembers = data.myAggregateMembers;
+ 		}
+ 
+ 		public void Rollback()
+@@ -126,6 +138,11 @@ public abstract class CppClassData : CppClassOrEnumData
+ 			myData.myFriendClasses = oldFriendClasses;
+ 			myData.myFriendTypes = oldFriendTypes;
+ 			myData.myPartialCliBases = oldPartialCliBases;
++			myData.myCliFinalizers = oldCliFinalizers;
++			myData.myAnonymousSubclassMembers = oldAnonymousSubclassMembers;
++			myData.myFriendPacks = oldFriendPacks;
++			myData.mySortedMembers = oldSortedMembers;
++			myData.myAggregateMembers = oldAggregateMembers;
+ 		}
+ 	}
+ 
+@@ -144,6 +161,36 @@ public abstract class CppClassData : CppClassOrEnumData
+ 		}
+ 	}
+ 
++	// @MOD C++/CX
++	private sealed class CxPartialBasesAreSet : ICppJournalEntry
++	{
++		// @MOD C++/CX: restore the preceding declaration's base state on reparse.
++		private readonly CppList<CppBasicBaseDescription<CppQualifiedName>> myOldBases;
++		private readonly CppBasicBaseDescription<CppQualType>[] myOldCachedBases;
++		private readonly CppList<CppBasicBaseDescription<ICppClassResolveEntity>>? myOldNonDependentBases;
++
++		private readonly CppClassData myData;
++
++		public CxPartialBasesAreSet(CppClassData data)
++		{
++			myData = data;
++			myOldBases = data.myRawBases;
++			myOldCachedBases = data.myCachedBases;
++			myOldNonDependentBases = data.myCachedNonDependentBases.Empty() ? null : data.myCachedNonDependentBases.Get();
++		}
++
++		public void Rollback()
++		{
++			myData.myRawBases = myOldBases;
++			myData.myCachedBases = myOldCachedBases;
++			myData.myCachedNonDependentBases.Clear();
++			if (myOldNonDependentBases.HasValue)
++			{
++				myData.myCachedNonDependentBases.Set(myOldNonDependentBases.Value);
++			}
++		}
++	}
++
+ 	private sealed class BasesAreCached : ICppJournalEntry
+ 	{
+ 		private readonly CppClassData myData;
+@@ -797,13 +844,36 @@ public abstract class CppClassData : CppClassOrEnumData
+ 
+ 	public virtual void SetBases(CppList<CppBasicBaseDescription<CppQualifiedName>> bases)
+ 	{
+-		if (bases.Count != 0)
++		// @MOD C++/CX: all partial base clauses are evaluated at the final definition.
++		bool composingPartialClass = HasDefinition() && HasCxPartialDeclarations();
++		if (composingPartialClass)
+ 		{
+-			for (int i = 0; i != bases.Count; i++)
++			CppList<CppBasicBaseDescription<CppQualifiedName>> combined = default(CppList<CppBasicBaseDescription<CppQualifiedName>>);
++			for (int i = myParts.Count - 1; i >= 0; i--)
++			{
++				if (myParts[i].Symbol is CppClassSymbol partial && CppClassSymbolUtil.IsCxPartial(partial))
++				{
++					foreach (CppBasicBaseDescription<CppQualifiedName> baseClass in partial.GetBases())
++					{
++						combined.Add(baseClass);
++					}
++				}
++			}
++			foreach (CppBasicBaseDescription<CppQualifiedName> baseClass in bases)
+ 			{
++				combined.Add(baseClass);
+ 			}
++			bases = combined;
++		}
++		if (bases.Count != 0 || composingPartialClass)
++		{
++			GetThat().GetJournal()?.Add(composingPartialClass ? new CxPartialBasesAreSet(this) : new BasesAreSet(this));
+ 			myRawBases = bases;
+-			GetThat().GetJournal()?.Add(new BasesAreSet(this));
++			if (composingPartialClass)
++			{
++				myCachedBases = null;
++				myCachedNonDependentBases.Clear();
++			}
+ 		}
+ 	}
+ 
+@@ -826,7 +896,7 @@ public abstract class CppClassData : CppClassOrEnumData
+ 		ICppMutableClassResolveEntity that = GetThat();
+ 		if (CppClassInheritance.NeedImplicitDisposable(that, new CppViewPos(that.GetLookupParent(), that.GetEndLocationAnchor(), null)))
+ 		{
+-			myPartialCliBases.Add(new CppBasicBaseDescription<ICppClassResolveEntity>(CppBaseSpecifiers.PUBLIC, CppGlobalNamespaceResolveEntity.GetInstance(that).GetBuiltinsRefs().cli_system_idisposable));
++			myPartialCliBases.Add(new CppBasicBaseDescription<ICppClassResolveEntity>(CppBaseSpecifiers.PUBLIC, CppGlobalNamespaceResolveEntity.GetInstance(that).GetBuiltinsRefs().GetManagedDisposable(that.GetFileResolveCache().TypeFactory.GetDialect().LanguageKind) /*@MOD C++/CX*/));
+ 		}
+ 	}
+ 
+@@ -934,6 +1004,42 @@ public abstract class CppClassData : CppClassOrEnumData
+ 	{
+ 	}
+ 
++	// @MOD C++/CX: the source parser has already visited partial bodies. Rebuild
++	// their semantic contents at the final definition, retaining source anchors.
++	public void PrepareCxPartialDefinition()
++	{
++		if (!HasDefinition() || !HasCxPartialDeclarations())
++		{
++			return;
++		}
++		RevertSymbolMerging();
++		NotMergedSymbolsState oldState = myNotMergedSymbolsState;
++		myNotMergedSymbolsState = NotMergedSymbolsState.IN_PROGRESS;
++		try
++		{
++			ResolveBases();
++			MergeCxPartialMembers(GetThat().GetFileResolveCache());
++		}
++		finally
++		{
++			myNotMergedSymbolsState = oldState;
++		}
++	}
++
++	// @MOD C++/CX
++	private void MergeCxPartialMembers(ICppResolveEntitiesCache cache)
++	{
++		ICppMutableClassResolveEntity that = GetThat();
++		for (int i = myParts.Count - 1; i >= 0; i--)
++		{
++			ClassPartDescription part = myParts[i];
++			if (part.Symbol is CppClassSymbol partial && CppClassSymbolUtil.IsCxPartial(partial))
++			{
++				CppSymbolTableMerger.MergeSymbolsToResolveEntity(new CppNestedFileResolveEntitiesCache(cache, part.Anchor.Next, cache.RootCache.GetDetachedData().GetOwningModule(that)), partial.Children, that, partial.ContainingFile);
++			}
++		}
++	}
++
+ 	public sealed override void MergeNonMergedSymbols()
+ 	{
+ 		ForceImportingImpl();
+@@ -961,6 +1067,11 @@ public abstract class CppClassData : CppClassOrEnumData
+ 				{
+ 					CppUE4Util.GenerateUE4ImplicitlyGeneratedMembers(that, CppUE4Util.MembersGenerationPoint.BeforeUserDefinedMembers, fileResolveCache);
+ 				}
++				// @MOD C++/CX: replay partial bodies before the final body's members.
++				if (HasCxPartialDeclarations())
++				{
++					MergeCxPartialMembers(fileResolveCache);
++				}
+ 				CppSymbolTableMerger.MergeSymbolsToResolveEntity(new CppNestedFileResolveEntitiesCache(fileResolveCache, myAnchorOfFirstNotMergedSymbol, fileResolveCache.RootCache.GetDetachedData().GetOwningModule(that)), myNotMergedSymbols, that, GetDefinitionSymbol()?.ContainingFile ?? default(CppFileLocation));
+ 				if (HasDefinition())
+ 				{
+@@ -1520,5 +1631,13 @@ public abstract class CppClassData : CppClassOrEnumData
+ 		myFriendClasses = null;
+ 		myFriendTypes.Clear();
+ 		myPartialCliBases = default(CppList<CppBasicBaseDescription<ICppClassResolveEntity>>);
++		// @MOD C++/CX
++		myCliFinalizers = null;
++		myAnonymousSubclassMembers = null;
++		myFriendPacks.Clear();
++		mySortedMembers = null;
++		myAggregateMembers = null;
++		myCachedClassConstructors.Clear();
++		myCachedClassConversions.Clear();
+ 	}
+ }

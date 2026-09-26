@@ -1,0 +1,13 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClassResolveEntityWithSubstitutionInstantiatedState.cs b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClassResolveEntityWithSubstitutionInstantiatedState.cs
+index 3a5ba6a7b1649c501c518cd372fcce573bee75ec..2212c7354be3b2053288600208d231e3447c59dd 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClassResolveEntityWithSubstitutionInstantiatedState.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClassResolveEntityWithSubstitutionInstantiatedState.cs
+@@ -180,7 +180,7 @@ public class CppClassResolveEntityWithSubstitutionInstantiatedState : ICppClassR
+ 			}
+ 			if (!myThat.HasNonGenericTemplateParents() && CppClassInheritance.NeedImplicitDisposable(myThat, ViewPosForMembersInstantiation()))
+ 			{
+-				ICppClassResolveEntity cli_system_idisposable = CppGlobalNamespaceResolveEntity.GetInstance(myInner).GetBuiltinsRefs().cli_system_idisposable;
++				ICppClassResolveEntity cli_system_idisposable = CppGlobalNamespaceResolveEntity.GetInstance(myInner).GetBuiltinsRefs().GetManagedDisposable(myThat.GetFileResolveCache().TypeFactory.GetDialect().LanguageKind); // @MOD C++/CX
+ 				myNonDependentBases.Add(new CppBasicBaseDescription<ICppClassResolveEntity>(CppBaseSpecifiers.PUBLIC, cli_system_idisposable));
+ 			}
+ 			myPhase = InstantiationPhase.DONE;

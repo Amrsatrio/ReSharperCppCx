@@ -1,0 +1,41 @@
+diff --git a/JetBrains.ReSharper.Feature.Services.Cpp.CodeCompletion/CppOverridingMethodsProviderBase.cs b/JetBrains.ReSharper.Feature.Services.Cpp.CodeCompletion/CppOverridingMethodsProviderBase.cs
+index 4581eb6a3abd4f9cf46e9e7e962584307e145ed3..e10469f7ad3969c52e48d4bfcbf975d46230e249 100644
+--- a/JetBrains.ReSharper.Feature.Services.Cpp.CodeCompletion/CppOverridingMethodsProviderBase.cs
++++ b/JetBrains.ReSharper.Feature.Services.Cpp.CodeCompletion/CppOverridingMethodsProviderBase.cs
+@@ -327,7 +327,7 @@ public abstract class CppOverridingMethodsProviderBase : ItemsProviderOfSpecific
+ 		{
+ 			if (!item.GetKey().IsCliInterface() || flag)
+ 			{
+-				CollectVirtualFunctions(item, hashSet2, returnType);
++				CollectVirtualFunctions(item, hashSet2, returnType, classResolveEntity);
+ 			}
+ 		}
+ 		if (hashSet2.IsEmpty())
+@@ -415,7 +415,7 @@ public abstract class CppOverridingMethodsProviderBase : ItemsProviderOfSpecific
+ 		}
+ 	}
+ 
+-	private static void CollectVirtualFunctions(ICppClassResolveEntity clazz, HashSet<MethodSignature> result, IReturnType returnType)
++	private static void CollectVirtualFunctions(ICppClassResolveEntity clazz, HashSet<MethodSignature> result, IReturnType returnType, ICppClassResolveEntity derived)
+ 	{
+ 		foreach (ICppResolveEntity child in clazz.GetChildren())
+ 		{
+@@ -425,7 +425,7 @@ public abstract class CppOverridingMethodsProviderBase : ItemsProviderOfSpecific
+ 			}
+ 			foreach (CppGroupedFunctionDeclaratorResolveEntity groupedFunction in cppDeclaratorResolveEntityPack.GetGroupedFunctions())
+ 			{
+-				if (groupedFunction.Name.IsQualifiedId() && groupedFunction.DeclarationSpecifiers.IsVirtual() && !IsOverrideOrFinal(groupedFunction))
++				if (groupedFunction.Name.IsQualifiedId() && groupedFunction.DeclarationSpecifiers.IsVirtual() && !IsOverrideOrFinalForCx(groupedFunction, derived))
+ 				{
+ 					CppQualType verboseType = groupedFunction.GetVerboseType();
+ 					if (returnType.Matches(verboseType))
+@@ -441,4 +441,9 @@ public abstract class CppOverridingMethodsProviderBase : ItemsProviderOfSpecific
+ 	{
+ 		return (decl.PureVirtualSpecifiers & (CppPureVirtualSpecifiers.Override | CppPureVirtualSpecifiers.Final)) != 0;
+ 	}
++
++	internal static bool IsOverrideOrFinalForCx(ICppGroupedFunctionDeclaratorResolveEntity decl, ICppClassResolveEntity derived)
++	{
++		return IsOverrideOrFinal(decl) || CppInheritanceUtil.IsCppCxSealedOverrideCandidate(decl, derived);
++	}
+ }

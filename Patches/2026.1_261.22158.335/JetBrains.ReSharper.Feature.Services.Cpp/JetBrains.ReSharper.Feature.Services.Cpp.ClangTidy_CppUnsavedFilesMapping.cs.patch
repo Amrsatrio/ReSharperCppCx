@@ -1,0 +1,42 @@
+diff --git a/JetBrains.ReSharper.Feature.Services.Cpp.ClangTidy/CppUnsavedFilesMapping.cs b/JetBrains.ReSharper.Feature.Services.Cpp.ClangTidy/CppUnsavedFilesMapping.cs
+index d1c0ab1bcd720f6852727239e050c5b6c26dd3e4..c0bec3dfd394a6a599ddceb4e600078889258dbd 100644
+--- a/JetBrains.ReSharper.Feature.Services.Cpp.ClangTidy/CppUnsavedFilesMapping.cs
++++ b/JetBrains.ReSharper.Feature.Services.Cpp.ClangTidy/CppUnsavedFilesMapping.cs
+@@ -26,11 +26,7 @@ public class CppUnsavedFilesMapping : IEnumerable<KeyValuePair<VirtualFileSystem
+ 
+ 	public CppUnsavedFilesMapping(Lifetime lifetime, ISolution solution, ISet<VirtualFileSystemPath> filesToSave, IDocument currentDocument, ILogger logger, [NotNull] Func<Lifetime, VirtualFileSystemPath, VirtualFileSystemPath> createTempLocation)
+ 	{
+-		ISet<VirtualFileSystemPath> filesToSave2 = filesToSave;
+-		Func<Lifetime, VirtualFileSystemPath, VirtualFileSystemPath> createTempLocation2 = createTempLocation;
+-		Lifetime lifetime2 = lifetime;
+-		ILogger logger2 = logger;
+-		base._002Ector();
++		// @MOD Fix compile
+ 		CppUnsavedFilesMapping cppUnsavedFilesMapping = this;
+ 		DocumentOperationsImpl component = solution.GetComponent<DocumentOperationsImpl>();
+ 		DocumentManager documentManager = DocumentManager.GetInstance(solution);
+@@ -46,12 +42,11 @@ public class CppUnsavedFilesMapping : IEnumerable<KeyValuePair<VirtualFileSystem
+ 			if (projectFile != null)
+ 			{
+ 				VirtualFileSystemPath location = projectFile.Location;
+-				if (!myMap.ContainsKey(location) && filesToSave2.Contains(location))
++				if (!myMap.ContainsKey(location) && filesToSave.Contains(location))
+ 				{
+-					VirtualFileSystemPath virtualFileSystemPath = createTempLocation2(lifetime2, location);
++					VirtualFileSystemPath virtualFileSystemPath = createTempLocation(lifetime, location);
+ 					WriteDocumentTextToFile(document, virtualFileSystemPath);
+-					ILogger logger3 = logger2;
+-					JetLogTraceInterpolatedStringHandler messageHandler = new JetLogTraceInterpolatedStringHandler(24, 2, logger3, out var isEnabled);
++					JetLogTraceInterpolatedStringHandler messageHandler = new JetLogTraceInterpolatedStringHandler(24, 2, logger, out var isEnabled);
+ 					if (isEnabled)
+ 					{
+ 						messageHandler.AppendLiteral("Unsaved file ");
+@@ -59,7 +54,7 @@ public class CppUnsavedFilesMapping : IEnumerable<KeyValuePair<VirtualFileSystem
+ 						messageHandler.AppendLiteral(" mapped to ");
+ 						messageHandler.AppendFormatted(virtualFileSystemPath);
+ 					}
+-					logger3.Trace(ref messageHandler);
++					logger.Trace(ref messageHandler);
+ 					myMap.Add(location, virtualFileSystemPath);
+ 				}
+ 			}

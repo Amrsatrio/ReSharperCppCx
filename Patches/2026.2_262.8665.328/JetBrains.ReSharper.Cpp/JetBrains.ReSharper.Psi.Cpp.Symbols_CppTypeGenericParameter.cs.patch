@@ -1,0 +1,13 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppTypeGenericParameter.cs b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppTypeGenericParameter.cs
+index 8310a9ccba44efdb11b874b414cc25b06b04562a..69950d88a366ff5e1d66122a6b49b9ed8ca57351 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppTypeGenericParameter.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppTypeGenericParameter.cs
+@@ -61,7 +61,7 @@ public sealed class CppTypeGenericParameter : CppTypeTemplateParameterBase, ICpp
+ 			}
+ 			if (cppList.Count == 0)
+ 			{
+-				cppList.Add(new CppBasicBaseDescription<CppQualType>(CppBaseSpecifiers.NONE, new CppQualType(resolveCache.GlobalNamespace.GetBuiltinsRefs().cli_system_object)));
++				cppList.Add(new CppBasicBaseDescription<CppQualType>(CppBaseSpecifiers.NONE, new CppQualType(resolveCache.GlobalNamespace.GetBuiltinsRefs().GetManagedObject(verboseTypeFactory.GetDialect().LanguageKind) /*@MOD C++/CX*/)));
+ 			}
+ 			myResolvedBases = cppList.TakeArray();
+ 			return myResolvedBases;

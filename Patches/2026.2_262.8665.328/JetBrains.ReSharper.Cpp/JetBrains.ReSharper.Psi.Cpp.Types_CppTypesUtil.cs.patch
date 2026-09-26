@@ -1,0 +1,157 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Types/CppTypesUtil.cs b/JetBrains.ReSharper.Psi.Cpp.Types/CppTypesUtil.cs
+index 0896db397501f794cdade44d16ccb82bf63ef115..a01f3c7c06e85e4bbab4fff072c42f44d84d7331 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Types/CppTypesUtil.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Types/CppTypesUtil.cs
+@@ -955,7 +955,7 @@ public static class CppTypesUtil
+ 			if (((uint)(opKind - 2) <= 5u || (uint)(opKind - 14) <= 1u) ? true : false)
+ 			{
+ 				bool flag3 = (uint)(opKind - 5) <= 2u;
+-				if (flag3 && dialect.LanguageKind == CppLanguageKind.CppCli)
++				if (flag3 && dialect.LanguageKind is CppLanguageKind.CppCli or CppLanguageKind.CppCx /*@MOD C++/CX*/)
+ 				{
+ 					bool flag4 = lhsT.Type.IsCliEnum();
+ 					bool flag5 = rhsT.Type.IsCliEnum();
+@@ -2166,7 +2166,42 @@ public static class CppTypesUtil
+ 
+ 	public static bool IsCliArray(this CppQualType t)
+ 	{
+-		return t.InternalAs<CppCliArrayType>() != null;
++		return t.InternalAs<CppCliArrayType>() != null || !t.GetCxArrayElementType().IsEmptyType(); // @MOD C++/CX
++	}
++
++	// @MOD C++/CX
++	private static CppQualType GetCxArrayElementType(this CppQualType t)
++	{
++		ICppClassResolveEntity clazz = t.GetResolvedClassTypeEntity();
++		if (clazz == null ||
++		    !(clazz.Name.GetInnerIfTemplateOrSubstitutionId().Equals(CppQualifiedId.ARRAY2_NAME) ||
++		      clazz.Name.GetInnerIfTemplateOrSubstitutionId().Equals(CppQualifiedId.WRITE_ONLY_ARRAY_NAME)) || // @MOD C++/CX
++		    !clazz.GetKey().IsCliRefClass() ||
++		    clazz.GetLookupParent() is not CppNamespaceResolveEntity platform ||
++		    platform.StructuralParent is not CppGlobalNamespaceResolveEntity ||
++		    !platform.Name.Equals(CppQualifiedId.PLATFORM_NAME))
++		{
++			return CppQualType.EmptyType();
++		}
++		ICppResolvedTypeFactory factory = clazz.GetTypeFactory();
++		if (factory.GetDialect().LanguageKind != CppLanguageKind.CppCx)
++		{
++			return CppQualType.EmptyType();
++		}
++		ICppTemplateArgument[] arguments = clazz.Name.GetTemplateArgumentsIfSubstitutionId();
++		if (arguments == null || arguments.Length < 1 || arguments.Length > 2 || arguments[0] is not ICppTypeTemplateArgument element)
++		{
++			return CppQualType.EmptyType();
++		}
++		if (arguments.Length == 2)
++		{
++			CppTypeContext context = new CppTypeContext(CppViewPos.Full(clazz), factory);
++			if (arguments[1] is not CppExpressionTemplateArgument rank || GetArraySize(rank.GetExpression(), in context) != 1)
++			{
++				return CppQualType.EmptyType();
++			}
++		}
++		return element.GetQualType().AppendCVQualifiers(t.CVQuals);
+ 	}
+ 
+ 	public static bool IsPointer(this CppQualType t)
+@@ -2995,7 +3030,7 @@ public static class CppTypesUtil
+ 
+ 	public static ICppExpression GetCliArrayRankExpression(this CppQualType t)
+ 	{
+-		return t.InternalAs<CppCliArrayType>()?.RankExpression;
++		return t.InternalAs<CppCliArrayType>()?.RankExpression ?? (!t.GetCxArrayElementType().IsEmptyType() ? CppIntegralValues.Int.Create(1) : null); // @MOD C++/CX
+ 	}
+ 
+ 	public static int? GetCliArrayRank(this CppQualType t, in CppTypeContext tc)
+@@ -3003,7 +3038,7 @@ public static class CppTypesUtil
+ 		CppCliArrayType cppCliArrayType = t.InternalAs<CppCliArrayType>();
+ 		if (cppCliArrayType == null)
+ 		{
+-			return null;
++			return !t.GetCxArrayElementType().IsEmptyType() ? 1 : null; // @MOD C++/CX
+ 		}
+ 		ICppValueExpression valueIfValueExpression = CppExpressionsUtil.GetValueIfValueExpression(cppCliArrayType.RankExpression);
+ 		if (valueIfValueExpression == null)
+@@ -3399,7 +3434,7 @@ public static class CppTypesUtil
+ 		CppNumericType cppNumericType = t.InternalAs<CppNumericType>();
+ 		if (cppNumericType != null)
+ 		{
+-			return globalNs.GetBuiltinsRefs().cli_system_numtypes?.ContainsKey(cppNumericType.Kind) ?? false;
++			return globalNs.GetBuiltinsRefs().GetManagedNumTypes(globalNs.SymbolCache.TypeFactory.GetDialect().LanguageKind) /*@MOD C++/CX*/?.ContainsKey(cppNumericType.Kind) ?? false;
+ 		}
+ 		if (!t.IsCliValueClassType())
+ 		{
+@@ -3412,9 +3447,13 @@ public static class CppTypesUtil
+ 	public static CppCliHandleType GetCliObjectHandleType(this ICppResolvedTypeFactory tf)
+ 	{
+ 		CppGlobalNamespaceResolveEntity.CppBuiltinsRefs builtinsRefs = tf.ResolveCache.GlobalNamespace.GetBuiltinsRefs();
+-		if (builtinsRefs != null && builtinsRefs.cli_system_object != null)
++		if (builtinsRefs != null)
+ 		{
+-			return tf.GetCliHandleType(new CppQualType(builtinsRefs.cli_system_object));
++			ICppClassResolveEntity builtinsRefsCliSystemObject = builtinsRefs.GetManagedObject(tf.GetDialect().LanguageKind); // @MOD C++/CX
++			if (builtinsRefsCliSystemObject != null)
++			{
++				return tf.GetCliHandleType(new CppQualType(builtinsRefsCliSystemObject));
++			}
+ 		}
+ 		return null;
+ 	}
+@@ -3425,10 +3464,10 @@ public static class CppTypesUtil
+ 		CppGlobalNamespaceResolveEntity.CppBuiltinsRefs builtinsRefs = tf.ResolveCache.GlobalNamespace.GetBuiltinsRefs();
+ 		if (builtinsRefs != null)
+ 		{
+-			ICppClassResolveEntity cli_system_string = builtinsRefs.cli_system_string;
+-			if (cli_system_string != null)
++			ICppClassResolveEntity builtinsRefsCliSystemString = builtinsRefs.GetManagedString(tf.GetDialect().LanguageKind); // @MOD C++/CX
++			if (builtinsRefsCliSystemString != null)
+ 			{
+-				return tf.GetCliHandleType(new CppQualType(cli_system_string));
++				return tf.GetCliHandleType(new CppQualType(builtinsRefsCliSystemString));
+ 			}
+ 		}
+ 		return null;
+@@ -3484,7 +3523,7 @@ public static class CppTypesUtil
+ 
+ 	public static CppQualType GetCliArrayInnerType(this CppQualType t)
+ 	{
+-		return t.InternalAs<CppCliArrayType>()?.ElementType.AppendCVQualifiers(t.CVQuals) ?? t.InternalAs<CppLinkageCliArrayType>()?.ElementType.AppendCVQualifiers(t.CVQuals) ?? CppQualType.EmptyType();
++		return t.InternalAs<CppCliArrayType>()?.ElementType.AppendCVQualifiers(t.CVQuals) ?? t.InternalAs<CppLinkageCliArrayType>()?.ElementType.AppendCVQualifiers(t.CVQuals) ?? t.GetCxArrayElementType(); // @MOD C++/CX
+ 	}
+ 
+ 	public static CppQualType GetCliArrayInnerType(this CppCliArrayType t, Qualifiers q)
+@@ -4273,7 +4312,7 @@ public static class CppTypesUtil
+ 		CppNumericType cppNumericType = t.InternalAs<CppNumericType>();
+ 		if (cppNumericType != null)
+ 		{
+-			HashMap<CppNumericTypeKind, ICppClassResolveEntity> cli_system_numtypes = globalNs.GetBuiltinsRefs().cli_system_numtypes;
++			HashMap<CppNumericTypeKind, ICppClassResolveEntity> cli_system_numtypes = globalNs.GetBuiltinsRefs().GetManagedNumTypes(globalNs.SymbolCache.TypeFactory.GetDialect().LanguageKind); // @MOD C++/CX
+ 			if (cli_system_numtypes != null && cli_system_numtypes.TryGetValue(cppNumericType.Kind, out var value))
+ 			{
+ 				return value;
+@@ -6131,7 +6170,8 @@ public static class CppTypesUtil
+ 
+ 	public static CppCliHandleConversionKind ClassifyCliHandleConversion(CppQualType from, CppQualType to, in CppTypeContext tc, bool allowObject)
+ 	{
+-		if (tc.Factory.GetDialect().LanguageKind != CppLanguageKind.CppCli)
++		CppLanguageKind languageKind = tc.Factory.GetDialect().LanguageKind;
++		if (!(languageKind is CppLanguageKind.CppCli or CppLanguageKind.CppCx) /*@MOD C++/CX*/)
+ 		{
+ 			return CppCliHandleConversionKind.No;
+ 		}
+@@ -6169,7 +6209,13 @@ public static class CppTypesUtil
+ 							}
+ 							return CppCliHandleConversionKind.No;
+ 						}
+-						HashMap<CppNumericTypeKind, ICppClassResolveEntity> cli_system_numtypes = tc.Factory.ResolveCache.GlobalNamespace.GetBuiltinsRefs().cli_system_numtypes;
++						if (languageKind == CppLanguageKind.CppCx && allowObject && // @MOD C++/CX
++						    cppClassResolveEntity is CppClrClassResolveEntity objectEntity &&
++						    objectEntity.GetBuiltinClass() == ICppClrClassResolveEntity.BuiltinClass.Object)
++						{
++							return CppCliHandleConversionKind.Yes;
++						}
++						HashMap<CppNumericTypeKind, ICppClassResolveEntity> cli_system_numtypes = tc.Factory.ResolveCache.GlobalNamespace.GetBuiltinsRefs().GetManagedNumTypes(languageKind); // @MOD C++/CX
+ 						if (cli_system_numtypes == null || !cli_system_numtypes.TryGetValue(cppNumericType.Kind, out var value))
+ 						{
+ 							return CppCliHandleConversionKind.No;

@@ -1,0 +1,115 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Language/CppResolveEntityDeclaredElement.cs b/JetBrains.ReSharper.Psi.Cpp.Language/CppResolveEntityDeclaredElement.cs
+index 96d84aed9b741870949d033e1a1c4d47404fedec..d9321fe4f2e5ce455212f321ca1ba67e13e9190a 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Language/CppResolveEntityDeclaredElement.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Language/CppResolveEntityDeclaredElement.cs
+@@ -8,6 +8,12 @@ using JetBrains.ReSharper.Psi.Cpp.Types;
+ using JetBrains.ReSharper.Psi.Cpp.Util;
+ using JetBrains.Util.dataStructures;
+ 
++// @MOD C++/CX Imports
++using JetBrains.ProjectModel;
++using JetBrains.ReSharper.Psi.Cpp.Caches;
++using JetBrains.ReSharper.Psi.Cpp.Tree;
++using JetBrains.ReSharper.Psi.Modules;
++
+ namespace JetBrains.ReSharper.Psi.Cpp.Language;
+ 
+ public sealed class CppResolveEntityDeclaredElement : CppDeclaredElementBase, ICppTypedDeclaredElement, ICppDeclaredElement, INavigatableDeclaredElement, IDeclaredElement, IUnmanagedCppDeclaredElement, ICppEntityPresentationInfo
+@@ -32,6 +38,97 @@ public sealed class CppResolveEntityDeclaredElement : CppDeclaredElementBase, IC
+ 		return myEntity.SymbolParts;
+ 	}
+ 
++	// @MOD C++/CX: navigation unwraps imported entities to CLR declarations before
++	// searching. Recover real header definitions through their resolved metadata
++	// identity, not through the CLI linkage converter's projected signatures.
++	public static IEnumerable<ICppSymbol> GetCppCxHeaderDefinitions(IClrDeclaredElement element)
++	{
++		if (element == null || !element.IsValid() || element.Module is not IAssemblyPsiModule module ||
++		    !string.Equals(module.Assembly.Location?.AssemblyPhysicalPath?.Name, "platform.winmd", System.StringComparison.OrdinalIgnoreCase))
++		{
++			yield break;
++		}
++		IPsiServices services = element.GetPsiServices();
++		CppGlobalSymbolCache cache = services.Solution.GetComponent<CppGlobalSymbolCache>();
++		HashSet<ICppSymbol> seen = new HashSet<ICppSymbol>(GenericSymbolLocationComparator<ICppSymbol>.INSTANCE);
++		foreach (string name in GetCppCxHeaderSearchNames(element))
++		{
++			foreach (ICppSymbol symbol in cache.SymbolNameCache.GetSymbolsByShortName(name))
++			{
++				if (symbol is not ICppParserSymbol parserSymbol || !parserSymbol.IsDefinition() ||
++				    !string.Equals(symbol.ContainingFile.Location.Name, "vccorlib.h", System.StringComparison.OrdinalIgnoreCase) ||
++				    !seen.Add(symbol))
++				{
++					continue;
++				}
++				foreach (IGenericSymbolNode declaration in symbol.LocateDeclaratorInAllFiles(services.Solution))
++				{
++					ICppResolveEntity entity = declaration.GetResolveEntity();
++					if (entity != null && entity.GetTypeFactory().GetDialect().LanguageKind == CppLanguageKind.CppCx &&
++					    MatchesCppCxHeaderDeclaration(entity, element))
++					{
++						yield return symbol;
++						break;
++					}
++				}
++			}
++		}
++	}
++
++	private static IEnumerable<string> GetCppCxHeaderSearchNames(IClrDeclaredElement element)
++	{
++		if (element is IProperty property)
++		{
++			yield return CppClrNameConverter.ConvertName(property).GetShortName();
++			if (property.Getter != null)
++				yield return CppClrNameConverter.GetAccessorName(property.Getter);
++			if (property.Setter != null)
++				yield return CppClrNameConverter.GetAccessorName(property.Setter);
++		}
++		else if (element is IEvent @event)
++		{
++			yield return @event.ShortName;
++			if (@event.Adder != null)
++				yield return CppClrNameConverter.GetAccessorName(@event.Adder);
++			if (@event.Remover != null)
++				yield return CppClrNameConverter.GetAccessorName(@event.Remover);
++			if (@event.Raiser != null)
++				yield return CppClrNameConverter.GetAccessorName(@event.Raiser);
++		}
++		else if (element is IAccessor accessor)
++			yield return CppClrNameConverter.GetAccessorName(accessor);
++		else if (element is ISignOperator signOperator)
++			yield return CppClrNameConverter.ConvertName(signOperator).GetShortName();
++		else if (element is IConversionOperator)
++			yield return "operator";
++		else if (element is IConstructor constructor)
++			yield return constructor.GetContainingType().ShortName;
++		else
++			yield return element.ShortName;
++	}
++
++	public static bool MatchesCppCxHeaderDeclaration(ICppResolveEntity entity, IClrDeclaredElement element)
++	{
++		if (entity is ICppDeclaratorResolveEntity declarator)
++			entity = declarator.TryFindGroupedDeclarator();
++		if (entity is CppGroupedFunctionDeclaratorResolveEntity function)
++		{
++			foreach (ICppFunctionOrVariableDeclaratorResolveEntity part in function.GetUngroupedDeclarators())
++			{
++				if (MatchesMetadata(part.FindClrElement()?.ClrDeclaredElement, element))
++					return true;
++			}
++			return false;
++		}
++		return MatchesMetadata(entity?.FindClrElement()?.ClrDeclaredElement, element);
++	}
++
++	private static bool MatchesMetadata(IClrDeclaredElement source, IClrDeclaredElement target)
++	{
++		return source != null && (source.Equals(target) ||
++			source is IAccessor accessor && accessor.OwnerMember.Equals(target));
++	}
++
+ 	public override CppAccessibility GetAccessibility()
+ 	{
+ 		if (myEntity is ICppDeclaratorResolveEntity cppDeclaratorResolveEntity)

@@ -1,0 +1,34 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppCxxCliPropertyResolveEntity.cs b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppCxxCliPropertyResolveEntity.cs
+index 8406cff7e7cf85c5052d2516ce9d77135a482b70..fc07258bb46880dfcc9b4c6e49410a5d4a65605a 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppCxxCliPropertyResolveEntity.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppCxxCliPropertyResolveEntity.cs
+@@ -45,13 +45,25 @@ public class CppCxxCliPropertyResolveEntity : CppCxxCliPropertyResolveEntityBase
+ 		}
+ 		ICppResolvedTypeFactory verboseTypeFactory = this.GetVerboseTypeFactory();
+ 		CppQualType cppType = GetCppType(verboseTypeFactory);
+-		CppFunctionFlags flags = new CppFunctionFlags(CppEllipsisKind.None, CppDecoratedCallingConvention.IMPLICIT_CLRCALL, this.GetRestrictionSpecifiers(), FuncRefQualifier.Empty);
++		// @MOD C++/CX
++		Language.CppLanguageDialect dialect = verboseTypeFactory.GetDialect();
++		CppDecoratedCallingConvention convention = dialect.LanguageKind == Language.CppLanguageKind.CppCx
++			? new CppDecoratedCallingConvention(false, DeclarationSpecifiers.IsStatic() ? dialect.DefaultCallingConvention : dialect.DefaultMemberCallingConvention)
++			: CppDecoratedCallingConvention.IMPLICIT_CLRCALL;
++		CppFunctionFlags flags = new CppFunctionFlags(CppEllipsisKind.None, convention, this.GetRestrictionSpecifiers(), FuncRefQualifier.Empty);
+ 		if (mySymbol.IsEvent)
+ 		{
+ 			CppQualType[] paramTypes = new CppQualType[1] { cppType };
+-			CppQualType functionType = verboseTypeFactory.GetFunctionType(CppPredefinedTypes.Void, paramTypes, flags);
+-			GenerateAccessor(CppQualifiedId.ADD_NAME, functionType);
+-			GenerateAccessor(CppQualifiedId.REMOVE_NAME, functionType);
++			// @MOD C++/CX: WinRT add returns the projected token; remove consumes it.
++			bool isCx = dialect.LanguageKind == Language.CppLanguageKind.CppCx;
++			CppQualType tokenType = isCx ? CppCxxCliPropertyDeclaratorResolveEntityUtil.GetEventRegistrationTokenType(this, verboseTypeFactory) : CppPredefinedTypes.Void;
++			GenerateAccessor(CppQualifiedId.ADD_NAME, verboseTypeFactory.GetFunctionType(tokenType, paramTypes, flags));
++			GenerateAccessor(CppQualifiedId.REMOVE_NAME, verboseTypeFactory.GetFunctionType(CppPredefinedTypes.Void, isCx ? new[] { tokenType } : paramTypes, flags));
++			// @MOD C++/CX: WinRT interfaces expose subscription only, not the implementation's raiser.
++			if (isCx && this.GetClassByMember().IsCliInterface())
++			{
++				return;
++			}
+ 			ICppClassResolveEntity resolvedClassTypeEntity = cppType.GetCliHandlePointeeType().GetResolvedClassTypeEntity();
+ 			if (resolvedClassTypeEntity != null && resolvedClassTypeEntity.IsCliDelegate())
+ 			{

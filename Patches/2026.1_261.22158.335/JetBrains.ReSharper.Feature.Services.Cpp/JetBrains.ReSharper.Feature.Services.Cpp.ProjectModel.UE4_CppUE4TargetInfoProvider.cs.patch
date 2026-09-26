@@ -1,0 +1,40 @@
+diff --git a/JetBrains.ReSharper.Feature.Services.Cpp.ProjectModel.UE4/CppUE4TargetInfoProvider.cs b/JetBrains.ReSharper.Feature.Services.Cpp.ProjectModel.UE4/CppUE4TargetInfoProvider.cs
+index 5c677c83e4d25abc72c6e07e37f840217be2a82d..0ac11b25fb5ee4550dc5ef81d4de8e9528978d79 100644
+--- a/JetBrains.ReSharper.Feature.Services.Cpp.ProjectModel.UE4/CppUE4TargetInfoProvider.cs
++++ b/JetBrains.ReSharper.Feature.Services.Cpp.ProjectModel.UE4/CppUE4TargetInfoProvider.cs
+@@ -380,6 +380,17 @@ public class CppUE4TargetInfoProvider : ICppUE4TargetInfoProvider
+ 			myLogger.DoActivity("ReadUE4JSON", "Reading JSON which describes Unreal Engine target info", delegate
+ 			{
+ 				List<CppUE4TargetInfo.CppUE4Target> targets = new List<CppUE4TargetInfo.CppUE4Target>();
++				// @MOD Fix compile
++				void ReadTargetsFrom(VirtualFileSystemPath uproject)
++				{
++					VirtualFileSystemPath targetInfoPathFor = targetInfoGenerator.GetTargetInfoPathFor(uproject);
++					CppUE4TargetInfo cppUE4TargetInfo = DeserializeFromFile(targetInfoPathFor);
++					if (cppUE4TargetInfo != null)
++					{
++						FixRelativePath(cppUE4TargetInfo, targetInfoPathFor);
++						targets.AddRange(cppUE4TargetInfo.Targets);
++					}
++				}
+ 				if (shouldGenerateForEngine)
+ 				{
+ 					ReadTargetsFrom(null);
+@@ -418,16 +429,7 @@ public class CppUE4TargetInfoProvider : ICppUE4TargetInfoProvider
+ 				myLogger.LogException(LoggingLevel.ERROR, exception2, ExceptionOrigin.Algorithmic, "Failed to report Unreal Engine statistics");
+ 			}
+ 		}
+-		void ReadTargetsFrom(VirtualFileSystemPath uproject)
+-		{
+-			VirtualFileSystemPath targetInfoPathFor = targetInfoGenerator.GetTargetInfoPathFor(uproject);
+-			CppUE4TargetInfo cppUE4TargetInfo = DeserializeFromFile(targetInfoPathFor);
+-			if (cppUE4TargetInfo != null)
+-			{
+-				FixRelativePath(cppUE4TargetInfo, targetInfoPathFor);
+-				P_1.targets.AddRange(cppUE4TargetInfo.Targets);
+-			}
+-		}
++		// @MOD Fix compile
+ 	}
+ 
+ 	private static void FixRelativePath(CppUE4TargetInfo targetInfo, VirtualFileSystemPath virtualFileSystemPath)

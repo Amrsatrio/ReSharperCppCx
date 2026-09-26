@@ -1,0 +1,25 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Lookup/CppLookup.cs b/JetBrains.ReSharper.Psi.Cpp.Lookup/CppLookup.cs
+index f6db0ade5c1f6355aa2acc3af0738870b91b1599..cb0460f3c67be6e0cb4be82822088de561ae4420 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Lookup/CppLookup.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Lookup/CppLookup.cs
+@@ -469,7 +469,9 @@ public class CppLookup
+ 							}
+ 							return CppLookupResult.ResolveError();
+ 						}
+-						goto IL_027d;
++						IL_027d: // @MOD Fix compile
++						ents = FrugalLocalList<ICppResolveEntity>.Of(cppGroupedDeclaratorResolveEntity);
++						goto IL_0386;
+ 					}
+ 					ents = CppClassMemberLookup.Lookup(cppClassResolveEntity, in viewPos, name2, parameters, forceHideByName: false);
+ 				}
+@@ -495,9 +497,6 @@ public class CppLookup
+ 				goto IL_0386;
+ 			}
+ 			return CppGenericLookup.ScopeNameLookup(in viewPos, new AfterDotUnqualifiedNameLookup(ent, flag), name);
+-			IL_027d:
+-			ents = FrugalLocalList<ICppResolveEntity>.Of(cppGroupedDeclaratorResolveEntity);
+-			goto IL_0386;
+ 			IL_0386:
+ 			ICppTemplateArgument[] args = cppSubstitutionId?.Arguments;
+ 			return CppPrincipalResolveEntityPicker.PickAndSubstitute(ents, CppClassTag.NO_TAG, flag2, in viewPos, args);

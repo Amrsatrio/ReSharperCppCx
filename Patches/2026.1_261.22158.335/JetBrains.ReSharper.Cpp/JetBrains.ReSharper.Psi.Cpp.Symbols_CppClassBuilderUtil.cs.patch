@@ -1,0 +1,23 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClassBuilderUtil.cs b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClassBuilderUtil.cs
+index 8c1a88d197411ea99b65bb18f8d16c3530703ba4..186d4102260918d1108b59d70e68b61cad51a1d6 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClassBuilderUtil.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClassBuilderUtil.cs
+@@ -52,6 +52,18 @@ public static class CppClassBuilderUtil
+ 		{
+ 			return false;
+ 		}
++		// @MOD C++/CX: partial bodies only join an exact, non-template class key.
++		if (CppClassSymbolUtil.IsCxPartial(symbol) || (ent is CppClassOrEnumData data && data.HasCxPartialDeclarations()))
++		{
++			if (ent is CppClassOrEnumData imported && imported.GetImportedModuleEntity() != null) // @MOD C++/CX: partial bodies cannot span translation units.
++			{
++				return false;
++			}
++			if (name.IsTemplateOrSubstitutionId() || ent.Name.IsTemplateOrSubstitutionId() || ent.GetKey() != symbol.Key)
++			{
++				return false;
++			}
++		}
+ 		if (ent.HasDefinition() && symbol is ICppDefinitionClassSymbol)
+ 		{
+ 			return false;

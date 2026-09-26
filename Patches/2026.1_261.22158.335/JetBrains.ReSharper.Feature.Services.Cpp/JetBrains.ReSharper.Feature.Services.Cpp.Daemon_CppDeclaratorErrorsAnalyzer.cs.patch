@@ -1,0 +1,27 @@
+diff --git a/JetBrains.ReSharper.Feature.Services.Cpp.Daemon/CppDeclaratorErrorsAnalyzer.cs b/JetBrains.ReSharper.Feature.Services.Cpp.Daemon/CppDeclaratorErrorsAnalyzer.cs
+index cf7dfc94018df3f5e7ce7d309ae0485df4f5c486..443c64bd5f2ed78737a9a5313ae7dc68a1651079 100644
+--- a/JetBrains.ReSharper.Feature.Services.Cpp.Daemon/CppDeclaratorErrorsAnalyzer.cs
++++ b/JetBrains.ReSharper.Feature.Services.Cpp.Daemon/CppDeclaratorErrorsAnalyzer.cs
+@@ -173,7 +173,9 @@ namespace JetBrains.ReSharper.Feature.Services.Cpp.Daemon;
+ 	typeof(TrailingReturnTypeSyntaxBeforeCpp11Error),
+ 	typeof(CppDeprecatedOverridenMethodWarning),
+ 	typeof(CppClassesErrorsAnalyzerUtil),
+-	typeof(CppTemplateParametersErrorsAnalyzer)
++	typeof(CppTemplateParametersErrorsAnalyzer),
++	typeof(CppSyntaxError),
++	typeof(CppCxRefPointerError)
+ })]
+ public class CppDeclaratorErrorsAnalyzer : CppDeclaratorErrorsBaseAnalyzer
+ {
+@@ -678,6 +680,11 @@ public class CppDeclaratorErrorsAnalyzer : CppDeclaratorErrorsBaseAnalyzer
+ 
+ 	public static void HighlightDestructorDeclaratorErrors(IHighlightingConsumer consumer, ICppNonAbstractDeclaratorNode declarator, DeclarationSpecifiers declarationSpecifiers, ICppDeclaratorResolveEntity ent, CppQualType destructorType)
+ 	{
++		string cxError = CppTreeModificationUtil.GetCxDestructorDeclarationError(declarator);
++		if (cxError != null)
++		{
++			consumer.AddHighlighting(new CppSyntaxError(cxError, declarator.GetDocumentRange()));
++		}
+ 		if (!ent.Name.GetInnerIfTemplateOrSubstitutionId().IsDestructorTag())
+ 		{
+ 			return;

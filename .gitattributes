@@ -1,0 +1,5 @@
+# Patch and manifest checksums must survive Windows Git checkouts.
+*.patch -text -filter
+*.json text eol=lf -filter
+*.ps1 text eol=lf -filter
+*.bat text eol=crlf -filter

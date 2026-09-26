@@ -1,0 +1,79 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Tree/CppNonAbstractDeclaratorNodeUtil.cs b/JetBrains.ReSharper.Psi.Cpp.Tree/CppNonAbstractDeclaratorNodeUtil.cs
+index 3d4658b41d4b9ab8e6fc6298bb90aebe06788716..9899505a050ddd08640392d45581795c0b2061cf 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Tree/CppNonAbstractDeclaratorNodeUtil.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Tree/CppNonAbstractDeclaratorNodeUtil.cs
+@@ -1,10 +1,74 @@
+ using JetBrains.ReSharper.Psi.Cpp.Language;
+ using JetBrains.ReSharper.Psi.Cpp.Symbols;
+ 
++// @MOD C++/CX Imports
++using JetBrains.ReSharper.Psi.Cpp.Parsing;
++using JetBrains.ReSharper.Psi.Cpp.Types;
++using JetBrains.ReSharper.Psi.Cpp.Util;
++using JetBrains.ReSharper.Psi.ExtensionsAPI.Tree;
++using JetBrains.ReSharper.Resources.Shell;
++using JetBrains.ReSharper.Psi.Tree;
++
+ namespace JetBrains.ReSharper.Psi.Cpp.Tree;
+ 
+ public static class CppNonAbstractDeclaratorNodeUtil
+ {
++	// @MOD C++/CX: The declarator analyzer supplies the type at this indirection,
++	// before stripping it. Inspect only its direct pointee, so Ref^* stays legal.
++	public static string GetCxRefTypePointerError(ITreeNode errorNode, CppQualType errorType)
++	{
++		if (errorNode == null || !errorNode.IsValid() || errorNode.NodeType != CppLexerTokenNodeTypes.MUL
++			|| errorNode.Parent is not ICppCompositeNode parent
++			|| parent.GetLanguageDialect().LanguageKind != CppLanguageKind.CppCx)
++		{
++			return null;
++		}
++		CppPointerType pointerType = errorType.InternalAs<CppPointerType>();
++		if (pointerType == null || pointerType.InnerType.IsRef)
++		{
++			return null;
++		}
++		ICppClassResolveEntity pointee = pointerType.InnerType.GetResolvedClassTypeEntity();
++		return pointee != null && pointee.GetKey().IsCliRefClassOrInterface()
++			? "'*' cannot be used on a C++/CX ref class or interface type; use '^' instead (C3699)"
++			: null;
++	}
++
++	// @MOD C++/CX: Re-resolve the selected indirection before applying a stale or bulk fix.
++	public static bool CanReplaceCxRefPointerWithHandle(ITreeNode node)
++	{
++		if (node == null || !node.IsValid() || node.NodeType != CppLexerTokenNodeTypes.MUL
++			|| node.Parent is not NestedDeclarator nested
++			|| nested.GetLanguageDialect().LanguageKind != CppLanguageKind.CppCx
++			|| !CppIsModifiableUtil.IsInsideModifiableFile(node)
++			|| !CppModificationUtil.CanBeReplacedToSomethingTrivial(node))
++		{
++			return false;
++		}
++		ICppNonNestedDeclaratorNode declarator = CppDeclaratorNodeNavigator.GetByNestedDeclarator(nested);
++		DeclarationSpecifiers specifiers = BaseDeclarationNavigator.GetByDeclarator(declarator)?.DeclarationSpecifiersNode;
++		if (specifiers == null)
++		{
++			return false;
++		}
++		var selection = new CppTypeSelection(
++			CppTypeSelectionFactory.CreateTypeDeclSpecsSelection(specifiers),
++			new CppDeclaratorSelection(nested, node.NextSibling, null));
++		return GetCxRefTypePointerError(node, selection.CalculateSelectedType(declarator.GetTypeFactory())) != null;
++	}
++
++	// @MOD C++/CX: Token replacement retains qualifiers, comments and surrounding type syntax.
++	public static void ReplaceCxRefPointerWithHandle(ITreeNode node)
++	{
++		using (WriteLockCookie.Create("Src\\Tree\\CppNonAbstractDeclaratorNodeUtil.cs", "ReplaceCxRefPointerWithHandle"))
++		{
++			if (CanReplaceCxRefPointerWithHandle(node))
++			{
++				CppModificationUtil.ReplaceChild(node, CppLexerTokenNodeTypes.XOR.CreateLeafElement());
++			}
++		}
++	}
++
+ 	public static bool IsDefaultInitInDeclarator(Declarator declarator)
+ 	{
+ 		ICppDeclaratorResolveEntity resolveEntity = declarator.GetResolveEntity();

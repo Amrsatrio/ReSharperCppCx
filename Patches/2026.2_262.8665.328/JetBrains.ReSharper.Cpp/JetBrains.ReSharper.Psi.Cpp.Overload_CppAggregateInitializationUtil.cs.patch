@@ -1,0 +1,32 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Overload/CppAggregateInitializationUtil.cs b/JetBrains.ReSharper.Psi.Cpp.Overload/CppAggregateInitializationUtil.cs
+index 533aa695b048ffac6447da241853cd3a609fccc3..554de38bc9c301e8db15cbfb545a9845756a79be 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Overload/CppAggregateInitializationUtil.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Overload/CppAggregateInitializationUtil.cs
+@@ -60,7 +60,8 @@ public static class CppAggregateInitializationUtil
+ 					{
+ 						return;
+ 					}
+-					ICppClassResolveEntity resolvedClassTypeEntity = type.GetResolvedClassTypeEntity();
++					bool cliArray = type.IsCliArray(); // @MOD C++/CX
++					ICppClassResolveEntity resolvedClassTypeEntity = cliArray ? null : type.GetResolvedClassTypeEntity();
+ 					if (resolvedClassTypeEntity != null)
+ 					{
+ 						if (!resolvedClassTypeEntity.IsClassComplete(in tc.ViewPos))
+@@ -140,7 +141,7 @@ public static class CppAggregateInitializationUtil
+ 						}
+ 						ElementMembers = list;
+ 					}
+-					else if (type.IsCliArray())
++					else if (cliArray) // @MOD C++/CX
+ 					{
+ 						ElementMembers = null;
+ 						ArrayMemberType = type.GetCliArrayInnerType();
+@@ -450,7 +451,7 @@ public static class CppAggregateInitializationUtil
+ 				else
+ 				{
+ 					cppImplicitConversionSequence = myCppConversionHelper.FromCopyInitialization(cppResolvedExpression, currentElementType);
+-					CppImplicitConversionSequence narrowingConversion = GetNarrowingConversion(cppImplicitConversionSequence);
++					CppImplicitConversionSequence narrowingConversion = currentElement.ElementType.IsCliArray() && myCppConversionHelper.TypeFactory.GetDialect().LanguageKind == CppLanguageKind.CppCx ? null : GetNarrowingConversion(cppImplicitConversionSequence); // @MOD C++/CX
+ 					if (narrowingConversion != null)
+ 					{
+ 						cppImplicitConversionSequence = narrowingConversion;

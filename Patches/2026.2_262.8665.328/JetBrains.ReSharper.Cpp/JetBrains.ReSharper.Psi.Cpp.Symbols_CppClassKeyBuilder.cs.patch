@@ -1,0 +1,21 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClassKeyBuilder.cs b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClassKeyBuilder.cs
+index c8de4137649ff44f4f120845136354b7307c8f36..b0e2c146d1a869f4ee6fb6e23aa0adcf4109307e 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClassKeyBuilder.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClassKeyBuilder.cs
+@@ -31,8 +31,16 @@ public struct CppClassKeyBuilder
+ 
+ 	private State myKey;
+ 
++	public bool IsCxPartial { get; private set; } // @MOD C++/CX
++
+ 	public void LearnToken(TokenNodeType tt)
+ 	{
++		// @MOD C++/CX: contextual partial does not change the underlying class key.
++		if (tt == CppTokenNodeTypes.CXXCX_PARTIAL_KEYWORD)
++		{
++			IsCxPartial = true;
++			return;
++		}
+ 		if (myKey == State.NONE)
+ 		{
+ 			if (tt == CppTokenNodeTypes.CLASS_KEYWORD)

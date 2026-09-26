@@ -1,0 +1,78 @@
+diff --git a/JetBrains.ReSharper.Feature.Services.Cpp.CodeStyle.SettingsUpgrade/SpaceAroundPtrSettingsUpgrader.cs b/JetBrains.ReSharper.Feature.Services.Cpp.CodeStyle.SettingsUpgrade/SpaceAroundPtrSettingsUpgrader.cs
+index d1fc514c8e2c5fd6859a53795bffec555ac34901..d7685cc277e504097deb2439a4b9f4aab9c93ddd 100644
+--- a/JetBrains.ReSharper.Feature.Services.Cpp.CodeStyle.SettingsUpgrade/SpaceAroundPtrSettingsUpgrader.cs
++++ b/JetBrains.ReSharper.Feature.Services.Cpp.CodeStyle.SettingsUpgrade/SpaceAroundPtrSettingsUpgrader.cs
+@@ -10,9 +10,29 @@ namespace JetBrains.ReSharper.Feature.Services.Cpp.CodeStyle.SettingsUpgrade;
+ [MigrateSettings]
+ public class SpaceAroundPtrSettingsUpgrader : IMigrateSettings
+ {
+-	private readonly List<Expression<Func<CppFormattingSettingsKey, object>>> mySourceEntries;
++	// @MOD Fix compile
++	private readonly List<Expression<Func<CppFormattingSettingsKey, object>>> mySourceEntries =
++	[
++		(CppFormattingSettingsKey it) => it.SPACE_BEFORE_PTR_IN_METHOD,
++		(CppFormattingSettingsKey it) => it.SPACE_BEFORE_PTR_IN_DATA_MEMBER,
++		(CppFormattingSettingsKey it) => it.SPACE_BEFORE_PTR_IN_DATA_MEMBERS,
++		(CppFormattingSettingsKey it) => it.SPACE_AFTER_PTR_IN_METHOD,
++		(CppFormattingSettingsKey it) => it.SPACE_AFTER_PTR_IN_DATA_MEMBER,
++		(CppFormattingSettingsKey it) => it.SPACE_AFTER_PTR_IN_DATA_MEMBERS,
++		(CppFormattingSettingsKey it) => it.SPACE_BEFORE_PTR_IN_ABSTRACT_DECL
++	];
+ 
+-	private readonly List<Expression<Func<CppFormattingSettingsKey, object>>> myTargetEntries;
++	// @MOD Fix compile
++	private readonly List<Expression<Func<CppFormattingSettingsKey, object>>> myTargetEntries =
++	[
++		(CppFormattingSettingsKey it) => it.SPACE_BEFORE_REF_IN_METHOD,
++		(CppFormattingSettingsKey it) => it.SPACE_BEFORE_REF_IN_DATA_MEMBER,
++		(CppFormattingSettingsKey it) => it.SPACE_BEFORE_REF_IN_DATA_MEMBERS,
++		(CppFormattingSettingsKey it) => it.SPACE_AFTER_REF_IN_METHOD,
++		(CppFormattingSettingsKey it) => it.SPACE_AFTER_REF_IN_DATA_MEMBER,
++		(CppFormattingSettingsKey it) => it.SPACE_AFTER_REF_IN_DATA_MEMBERS,
++		(CppFormattingSettingsKey it) => it.SPACE_BEFORE_REF_IN_ABSTRACT_DECL
++	];
+ 
+ 	public IEnumerable<SettingsEntry> GetEntriesToMigrate(ISettingsSchema schema)
+ 	{
+@@ -35,40 +55,5 @@ public class SpaceAroundPtrSettingsUpgrader : IMigrateSettings
+ 		}
+ 	}
+ 
+-	public SpaceAroundPtrSettingsUpgrader()
+-	{
+-		List<Expression<Func<CppFormattingSettingsKey, object>>> list = new List<Expression<Func<CppFormattingSettingsKey, object>>>();
+-		List<Expression<Func<CppFormattingSettingsKey, object>>> list2 = list;
+-		list2.Add((CppFormattingSettingsKey it) => it.SPACE_BEFORE_PTR_IN_METHOD);
+-		List<Expression<Func<CppFormattingSettingsKey, object>>> list3 = list;
+-		list3.Add((CppFormattingSettingsKey it) => it.SPACE_BEFORE_PTR_IN_DATA_MEMBER);
+-		List<Expression<Func<CppFormattingSettingsKey, object>>> list4 = list;
+-		list4.Add((CppFormattingSettingsKey it) => it.SPACE_BEFORE_PTR_IN_DATA_MEMBERS);
+-		List<Expression<Func<CppFormattingSettingsKey, object>>> list5 = list;
+-		list5.Add((CppFormattingSettingsKey it) => it.SPACE_AFTER_PTR_IN_METHOD);
+-		List<Expression<Func<CppFormattingSettingsKey, object>>> list6 = list;
+-		list6.Add((CppFormattingSettingsKey it) => it.SPACE_AFTER_PTR_IN_DATA_MEMBER);
+-		List<Expression<Func<CppFormattingSettingsKey, object>>> list7 = list;
+-		list7.Add((CppFormattingSettingsKey it) => it.SPACE_AFTER_PTR_IN_DATA_MEMBERS);
+-		List<Expression<Func<CppFormattingSettingsKey, object>>> list8 = list;
+-		list8.Add((CppFormattingSettingsKey it) => it.SPACE_BEFORE_PTR_IN_ABSTRACT_DECL);
+-		mySourceEntries = list;
+-		list = new List<Expression<Func<CppFormattingSettingsKey, object>>>();
+-		List<Expression<Func<CppFormattingSettingsKey, object>>> list9 = list;
+-		list9.Add((CppFormattingSettingsKey it) => it.SPACE_BEFORE_REF_IN_METHOD);
+-		List<Expression<Func<CppFormattingSettingsKey, object>>> list10 = list;
+-		list10.Add((CppFormattingSettingsKey it) => it.SPACE_BEFORE_REF_IN_DATA_MEMBER);
+-		List<Expression<Func<CppFormattingSettingsKey, object>>> list11 = list;
+-		list11.Add((CppFormattingSettingsKey it) => it.SPACE_BEFORE_REF_IN_DATA_MEMBERS);
+-		List<Expression<Func<CppFormattingSettingsKey, object>>> list12 = list;
+-		list12.Add((CppFormattingSettingsKey it) => it.SPACE_AFTER_REF_IN_METHOD);
+-		List<Expression<Func<CppFormattingSettingsKey, object>>> list13 = list;
+-		list13.Add((CppFormattingSettingsKey it) => it.SPACE_AFTER_REF_IN_DATA_MEMBER);
+-		List<Expression<Func<CppFormattingSettingsKey, object>>> list14 = list;
+-		list14.Add((CppFormattingSettingsKey it) => it.SPACE_AFTER_REF_IN_DATA_MEMBERS);
+-		List<Expression<Func<CppFormattingSettingsKey, object>>> list15 = list;
+-		list15.Add((CppFormattingSettingsKey it) => it.SPACE_BEFORE_REF_IN_ABSTRACT_DECL);
+-		myTargetEntries = list;
+-		base._002Ector();
+-	}
++	// @MOD Fix compile
+ }

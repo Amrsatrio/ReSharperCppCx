@@ -1,0 +1,253 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Expressions/CppExpressionEvaluator.cs b/JetBrains.ReSharper.Psi.Cpp.Expressions/CppExpressionEvaluator.cs
+index f82f416f768c916675edabd8d1eba821477ea3c1..06f661ed220b5f751881b17c18a2f6ee97048045 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Expressions/CppExpressionEvaluator.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Expressions/CppExpressionEvaluator.cs
+@@ -934,7 +934,6 @@ public class CppExpressionEvaluator : CppAbstractResolvedExpressionVisitor<ICppE
+ 		ICppGroupedDeclaratorResolveEntity cppGroupedDeclaratorResolveEntity;
+ 		ICppEvaluationResult cppEvaluationResult;
+ 		bool flag;
+-		bool flag2;
+ 		if (!(referenceEntity is ICppEnumeratorResolveEntity cppEnumeratorResolveEntity))
+ 		{
+ 			cppGroupedDeclaratorResolveEntity = referenceEntity as ICppGroupedDeclaratorResolveEntity;
+@@ -1020,69 +1019,50 @@ public class CppExpressionEvaluator : CppAbstractResolvedExpressionVisitor<ICppE
+ 				flag = cppEvaluationResult != null;
+ 				if (flag)
+ 				{
+-					if (cppEvaluationResult is CppReferenceValue cppReferenceValue3)
++					flag = cppEvaluationResult is CppReferenceValue cppReferenceValue3 ? cppReferenceValue3 is not CppReferenceToTemporary : cppEvaluationResult is CppEvaluationFail; // @MOD Degoto'd to fix compile
++				}
++				if (flag && (!cppEvaluationResult.IsUninitializedValue() || cppGroupedVariableDeclaratorResolveEntity.GetCppType(TypeFactory).IsRef))
++				{
++					return cppEvaluationResult;
++				}
++				if (cppGroupedDeclaratorResolveEntity.GetDependentInfo().IsUnknownDependent())
++				{
++					return this.InternalFail();
++				}
++				if (cppGroupedVariableDeclaratorResolveEntity.GetAnyUngrouped() is CppVariableDeclaratorResolveEntityWithSubstitution cppVariableDeclaratorResolveEntityWithSubstitution && cppVariableDeclaratorResolveEntityWithSubstitution.GetTypedInner().GetAnyUngrouped() is CppImportedVariableDeclaratorResolveEntity { Source: var source })
++				{
++					if (!(source is CppModuleOfBuiltins.RsCppTemplateVar rsCppTemplateVar))
+ 					{
+-						if (!(cppReferenceValue3 is CppReferenceToTemporary))
++						if (source is CppModuleOfBuiltins.RsCppArrayExtentTemplateVar)
+ 						{
+-							goto IL_017f;
++							return CalculateArrayExtent(cppGroupedVariableDeclaratorResolveEntity);
+ 						}
+ 					}
+-					else if (cppEvaluationResult is CppEvaluationFail)
++					else
+ 					{
+-						goto IL_017f;
++						string qualifiedIdValue = rsCppTemplateVar.Name.CastToModuleTemplateId().Inner.GetQualifiedIdValue();
++						if (qualifiedIdValue == "__rscpp_array_rank")
++						{
++							return CalculateArrayRank(cppGroupedVariableDeclaratorResolveEntity);
++						}
++						if (qualifiedIdValue == "__rscpp_structured_binding_size")
++						{
++							return CalculateStructuredBindingSize(cppGroupedVariableDeclaratorResolveEntity);
++						}
+ 					}
+-					flag2 = false;
+-					goto IL_0187;
+ 				}
+-				goto IL_018b;
+ 			}
+-			goto IL_0266;
+-		}
+-		if (TypeContext.ViewPos.ResolveScope().IsEnumeratorInEnumerationScope(cppEnumeratorResolveEntity))
+-		{
+-			return cppEnumeratorResolveEntity.GetValueInEnumerationScope(Tracker);
+ 		}
+-		return cppEnumeratorResolveEntity.GetValue(Tracker);
+-		IL_0187:
+-		flag = flag2;
+-		goto IL_018b;
+-		IL_0266:
+-		return CppReferenceToDeclarator.Create(cppGroupedDeclaratorResolveEntity, e.GetViewPos(), this);
+-		IL_017f:
+-		flag2 = true;
+-		goto IL_0187;
+-		IL_018b:
+-		if (flag && (!cppEvaluationResult.IsUninitializedValue() || cppGroupedVariableDeclaratorResolveEntity.GetCppType(TypeFactory).IsRef))
+-		{
+-			return cppEvaluationResult;
+-		}
+-		if (cppGroupedDeclaratorResolveEntity.GetDependentInfo().IsUnknownDependent())
+-		{
+-			return this.InternalFail();
+-		}
+-		if (cppGroupedVariableDeclaratorResolveEntity.GetAnyUngrouped() is CppVariableDeclaratorResolveEntityWithSubstitution cppVariableDeclaratorResolveEntityWithSubstitution && cppVariableDeclaratorResolveEntityWithSubstitution.GetTypedInner().GetAnyUngrouped() is CppImportedVariableDeclaratorResolveEntity { Source: var source })
++		else
+ 		{
+-			if (!(source is CppModuleOfBuiltins.RsCppTemplateVar rsCppTemplateVar))
++			if (TypeContext.ViewPos.ResolveScope().IsEnumeratorInEnumerationScope(cppEnumeratorResolveEntity))
+ 			{
+-				if (source is CppModuleOfBuiltins.RsCppArrayExtentTemplateVar)
+-				{
+-					return CalculateArrayExtent(cppGroupedVariableDeclaratorResolveEntity);
+-				}
+-			}
+-			else
+-			{
+-				string qualifiedIdValue = rsCppTemplateVar.Name.CastToModuleTemplateId().Inner.GetQualifiedIdValue();
+-				if (qualifiedIdValue == "__rscpp_array_rank")
+-				{
+-					return CalculateArrayRank(cppGroupedVariableDeclaratorResolveEntity);
+-				}
+-				if (qualifiedIdValue == "__rscpp_structured_binding_size")
+-				{
+-					return CalculateStructuredBindingSize(cppGroupedVariableDeclaratorResolveEntity);
+-				}
++				return cppEnumeratorResolveEntity.GetValueInEnumerationScope(Tracker);
+ 			}
++			return cppEnumeratorResolveEntity.GetValue(Tracker);
+ 		}
+-		goto IL_0266;
++
++		return CppReferenceToDeclarator.Create(cppGroupedDeclaratorResolveEntity, e.GetViewPos(), this);
+ 	}
+ 
+ 	[NotNull]
+@@ -1986,6 +1966,14 @@ public class CppExpressionEvaluator : CppAbstractResolvedExpressionVisitor<ICppE
+ 			return CppClassTraitsUtil.IsRefArray(type).ToTriBool();
+ 		case CppSingleArgumentTypeTraitKind.IS_REF_CLASS:
+ 			return CppClassTraitsUtil.IsRefClass(type).ToTriBool();
++		case CppSingleArgumentTypeTraitKind.IS_WIN_CLASS: // @MOD C++/CX
++			return type.GetDependentInfo().IsTypeOrValueDependentOrContainsDependencyKiller() ? TriBool.Indeterminate : CppClassTraitsUtil.IsRefClass(type).ToTriBool();
++		case CppSingleArgumentTypeTraitKind.IS_WIN_INTERFACE: // @MOD C++/CX
++			return type.GetDependentInfo().IsTypeOrValueDependentOrContainsDependencyKiller() ? TriBool.Indeterminate : CppClassTraitsUtil.IsInterfaceClass(type).ToTriBool();
++		case CppSingleArgumentTypeTraitKind.IS_WINRT_AGILE: // @MOD C++/CX
++			return IsWinRtAgile(type, in vp);
++		case CppSingleArgumentTypeTraitKind.IS_VALID_WINRT_TYPE: // @MOD C++/CX
++			return IsValidWinRtType(type);
+ 		case CppSingleArgumentTypeTraitKind.IS_VALUE_CLASS:
+ 			return CppClassTraitsUtil.IsValueClass(type).ToTriBool();
+ 		case CppSingleArgumentTypeTraitKind.IS_SEALED:
+@@ -2018,6 +2006,124 @@ public class CppExpressionEvaluator : CppAbstractResolvedExpressionVisitor<ICppE
+ 		}
+ 	}
+ 
++	// @MOD C++/CX
++	private static TriBool IsValidWinRtType(CppQualType type)
++	{
++		if (type.GetDependentInfo().IsTypeOrValueDependentOrContainsDependencyKiller())
++		{
++			return TriBool.Indeterminate;
++		}
++		if (type.IsRef || type.IsConst || type.IsVolatile)
++		{
++			return TriBool.False;
++		}
++		// The MSVC intrinsic also accepts one native indirection for an out parameter,
++		// but not void*, function pointers, or another level of native indirection.
++		if (type.InternalAs<CppPointerType>() is CppPointerType pointer)
++		{
++			type = pointer.InnerType;
++			if (type.IsPointer() || type.IsVoid() || type.IsFunctionType() ||
++			    type.IsRef || type.IsConst || type.IsVolatile)
++			{
++				return TriBool.False;
++			}
++		}
++		if (type.InternalAs<CppCliHandleType>() is CppCliHandleType handle)
++		{
++			type = handle.InnerType;
++			if (type.IsConst || type.IsVolatile || type.IsCliArray())
++			{
++				return TriBool.False;
++			}
++			return type.IsCliRefClassOrInterfaceType().ToTriBool();
++		}
++		if (type.IsVoid() || type.IsFunctionType() || type.IsNullptrType() || type.IsCliArray())
++		{
++			return TriBool.True;
++		}
++		if (type.GetNumericType() is CppNumericType numeric)
++		{
++			CppNumericTypeKind kind = numeric.Kind;
++			// WinRT metadata excludes Int8, C++ char/long, and extended floating types.
++			return (kind == CppIntTypeKind.BOOL || kind == CppIntTypeKind.UCHAR ||
++			        kind == CppIntTypeKind.WCHAR_T || kind == CppIntTypeKind.CHAR16_T || kind == CppIntTypeKind.CHAR32_T ||
++			        kind == CppIntTypeKind.SHORT || kind == CppIntTypeKind.USHORT ||
++			        kind == CppIntTypeKind.INT || kind == CppIntTypeKind.UINT ||
++			        kind == CppIntTypeKind.LONGLONG || kind == CppIntTypeKind.ULONGLONG ||
++			        kind == CppFloatTypeKind.FLOAT || kind == CppFloatTypeKind.DOUBLE).ToTriBool();
++		}
++		ICppClassResolveEntity clazz = type.InternalAs<ICppClassResolveEntity>();
++		return (clazz != null && (clazz.GetKey().IsCliClassOrInterface() || clazz.IsCliEnum())).ToTriBool();
++	}
++
++	// @MOD C++/CX
++	private TriBool IsWinRtAgile(CppQualType type, in CppViewPos vp)
++	{
++		if (type.GetDependentInfo().IsTypeOrValueDependentOrContainsDependencyKiller())
++		{
++			return TriBool.Indeterminate;
++		}
++		ICppClassResolveEntity clazz = type.InternalAs<ICppClassResolveEntity>();
++		if (clazz == null || !clazz.GetKey().IsCliRefClass() || clazz.IsCliDelegate())
++		{
++			return TriBool.False;
++		}
++		if (!clazz.IsClassComplete(in vp))
++		{
++			return TriBool.Indeterminate;
++		}
++		ICppClrElementResolveEntity clrElement = clazz.FindClrElement();
++		if (clrElement is ICppClrClassResolveEntity clrClass &&
++		    clrClass.GetBuiltinClass() is ICppClrClassResolveEntity.BuiltinClass.Object or ICppClrClassResolveEntity.BuiltinClass.String)
++		{
++			return TriBool.True;
++		}
++		if (clrElement?.ClrDeclaredElement is ITypeElement clrType)
++		{
++			foreach (IAttributeInstance attribute in clrType.GetAttributeInstances(AttributesSource.Self))
++			{
++				if (attribute.GetClrName().FullName != "Windows.Foundation.Metadata.MarshalingBehaviorAttribute")
++				{
++					continue;
++				}
++				if (attribute.PositionParameterCount != 1)
++				{
++					return TriBool.Indeterminate;
++				}
++				AttributeValue value = attribute.PositionParameter(0);
++				if (!value.IsConstant || !value.ConstantValue.IsValid())
++				{
++					return TriBool.Indeterminate;
++				}
++				ConstantValue constant = value.ConstantValue;
++				if (constant.IsEnum())
++				{
++					constant = constant.ToEnumUnderlyingType();
++				}
++				return constant.IsInteger(out int marshalingType) ? (marshalingType == 2).ToTriBool() : TriBool.Indeterminate;
++			}
++			// Imported classes without an agility contract are not known to be agile.
++			return TriBool.False;
++		}
++		foreach (ICppAttribute attribute in clazz.GetAttributes(in vp))
++		{
++			if (!attribute.GetName().Equals(CppAttribute.CxMarshalingBehaviorName))
++			{
++				continue;
++			}
++			if (attribute is not CppAttributeWithArgument<ICppExpression> { Argument: ICppResolvedExpression argument } ||
++			    argument.GetDependentInfo().IsTypeOrValueDependentOrContainsDependencyKiller())
++			{
++				return TriBool.Indeterminate;
++			}
++			return argument.EvaluateAndConvert(CppPredefinedTypes.Int, this) is CppIntegralValues.Int value
++				? (value.RawRepresentation == 2).ToTriBool()
++				: TriBool.Indeterminate;
++		}
++		// C++/CX ref classes are agile by default; Threading alone does not change marshaling.
++		return TriBool.True;
++	}
++
+ 	[NotNull]
+ 	public override ICppEvaluationResult Visit(ICppResolvedDoubleArgumentTypeTraitExpression e)
+ 	{
