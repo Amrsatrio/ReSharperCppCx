@@ -574,7 +574,7 @@ function Get-RiderInstallationInfo {
 }
 
 function Get-RiderInstallations {
-    param([string[]]$AdditionalPath = @())
+    param([string[]]$AdditionalPath = @(), [string]$ToolboxRoot)
     $candidates = [Collections.Generic.Dictionary[string,object]]::new([StringComparer]::OrdinalIgnoreCase)
     function Add-RiderCandidate([string]$Path, [string]$Source) {
         if ([string]::IsNullOrWhiteSpace($Path)) { return }
@@ -660,18 +660,41 @@ function Get-RiderInstallations {
             finally { $base.Dispose() }
         }
     }
-    if (-not [string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
-        $toolboxRoot = Join-Path $env:LOCALAPPDATA 'JetBrains\Toolbox'
-        $settingsPath = Join-Path $toolboxRoot '.settings.json'
+    if (-not $PSBoundParameters.ContainsKey('ToolboxRoot') -and
+        -not [string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
+        $ToolboxRoot = Join-Path $env:LOCALAPPDATA 'JetBrains\Toolbox'
+    }
+    if (-not [string]::IsNullOrWhiteSpace($ToolboxRoot)) {
+        $settingsPath = Join-Path $ToolboxRoot '.settings.json'
         if (Test-Path -LiteralPath $settingsPath -PathType Leaf) {
             try {
                 $settings = [IO.File]::ReadAllText($settingsPath) | ConvertFrom-Json
-                $installLocation = [string]$settings.install_location
-                Scan-RiderRoot $installLocation 3 'toolbox-settings'
-                Scan-RiderRoot (Join-Path $installLocation 'apps') 6 'toolbox1-settings'
+                $installProperty = $settings.PSObject.Properties['install_location']
+                if ($null -ne $installProperty -and
+                    -not [string]::IsNullOrWhiteSpace([string]$installProperty.Value)) {
+                    $installLocation = [string]$installProperty.Value
+                    Scan-RiderRoot $installLocation 3 'toolbox-settings'
+                    Scan-RiderRoot (Join-Path $installLocation 'apps') 6 'toolbox1-settings'
+                }
             }
-            catch { Write-Warning "Ignoring malformed Toolbox settings: $settingsPath" }
+            catch { Write-Warning "Ignoring malformed Toolbox settings JSON: $settingsPath" }
         }
+        $statePath = Join-Path $ToolboxRoot 'state.json'
+        if (Test-Path -LiteralPath $statePath -PathType Leaf) {
+            try {
+                $toolboxState = [IO.File]::ReadAllText($statePath) | ConvertFrom-Json
+                $toolsProperty = $toolboxState.PSObject.Properties['tools']
+                if ($null -eq $toolsProperty) { throw 'Missing tools array.' }
+                foreach ($tool in @($toolsProperty.Value)) {
+                    if ([string]$tool.productCode -ceq 'RD') {
+                        Add-RiderCandidate ([string]$tool.installLocation) 'toolbox-state'
+                    }
+                }
+            }
+            catch { Write-Warning "Ignoring malformed Toolbox state JSON: $statePath" }
+        }
+    }
+    if (-not [string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
         Scan-RiderRoot (Join-Path $env:LOCALAPPDATA 'Programs') 2 'local-programs'
         Scan-RiderRoot (Join-Path $env:LOCALAPPDATA 'JetBrains\Installations') 3 'jetbrains-installations'
     }
