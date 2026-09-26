@@ -1,5 +1,5 @@
 diff --git a/JetBrains.ReSharper.Psi.Cpp.Parsing/CppNodeTypeCounter.cs b/JetBrains.ReSharper.Psi.Cpp.Parsing/CppNodeTypeCounter.cs
-index 3f787daab4d5809096cdbdf7f514d28df85a7b85..f5e4ac21bf94e3f45d42cbf24f1948ee78870bb2 100644
+index 3f787daab4d5809096cdbdf7f514d28df85a7b85..54f86855906c88f5b86ad8350ec48241ad2ddab8 100644
 --- a/JetBrains.ReSharper.Psi.Cpp.Parsing/CppNodeTypeCounter.cs
 +++ b/JetBrains.ReSharper.Psi.Cpp.Parsing/CppNodeTypeCounter.cs
 @@ -4,7 +4,7 @@ namespace JetBrains.ReSharper.Psi.Cpp.Parsing;
@@ -7,7 +7,7 @@ index 3f787daab4d5809096cdbdf7f514d28df85a7b85..f5e4ac21bf94e3f45d42cbf24f1948ee
  public class CppNodeTypeCounter
  {
 -	private static int ourTokenTypeCounter = 587;
-+	private static int ourTokenTypeCounter = (int)CppTokenKind._NUMBER_OF_ELEMENTS_; // @MOD C++/CX
++	private static int ourTokenTypeCounter = (int)CppTokenKind._NUMBER_OF_ELEMENTS_CX_; // @MOD C++/CX
  
  	public static int IncIndex()
  	{

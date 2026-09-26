@@ -1,5 +1,5 @@
 diff --git a/JetBrains.ReSharper.Psi.Cpp.Parsing/CppTokenNodeType.cs b/JetBrains.ReSharper.Psi.Cpp.Parsing/CppTokenNodeType.cs
-index 4055012055e94427a89dd066f96c628d96f25756..4f096eac7f35e4f1b470dd32ef2ad3d73ac64f88 100644
+index 4055012055e94427a89dd066f96c628d96f25756..53b977b4b7b938a852f794327d260ded2e80afa2 100644
 --- a/JetBrains.ReSharper.Psi.Cpp.Parsing/CppTokenNodeType.cs
 +++ b/JetBrains.ReSharper.Psi.Cpp.Parsing/CppTokenNodeType.cs
 @@ -7,7 +7,7 @@ namespace JetBrains.ReSharper.Psi.Cpp.Parsing;
@@ -7,7 +7,7 @@ index 4055012055e94427a89dd066f96c628d96f25756..4f096eac7f35e4f1b470dd32ef2ad3d7
  public abstract class CppTokenNodeType : TokenNodeType
  {
 -	private static readonly CppTokenNodeType[] ourTokenByIndex = new CppTokenNodeType[587];
-+	private static readonly CppTokenNodeType[] ourTokenByIndex = new CppTokenNodeType[(int)CppTokenKind._NUMBER_OF_ELEMENTS_]; // @MOD C++/CX
++	private static readonly CppTokenNodeType[] ourTokenByIndex = new CppTokenNodeType[(int)CppTokenKind._NUMBER_OF_ELEMENTS_CX_]; // @MOD C++/CX
  
  	public override bool IsWhitespace
  	{
