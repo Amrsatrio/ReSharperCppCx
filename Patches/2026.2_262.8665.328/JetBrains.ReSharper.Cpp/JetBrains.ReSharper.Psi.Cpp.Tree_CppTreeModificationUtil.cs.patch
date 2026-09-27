@@ -1,8 +1,8 @@
 diff --git a/JetBrains.ReSharper.Psi.Cpp.Tree/CppTreeModificationUtil.cs b/JetBrains.ReSharper.Psi.Cpp.Tree/CppTreeModificationUtil.cs
-index 1f185efa09c58cd6121ac3014bd03a175ab61b9f..0bc3dbe59f6a2bab443ec3235904e59cc841605d 100644
+index 1f185efa09c58cd6121ac3014bd03a175ab61b9f..762ebf2a254b75f368f520115d42ed7ab72b4e62 100644
 --- a/JetBrains.ReSharper.Psi.Cpp.Tree/CppTreeModificationUtil.cs
 +++ b/JetBrains.ReSharper.Psi.Cpp.Tree/CppTreeModificationUtil.cs
-@@ -8,10 +8,292 @@ using JetBrains.ReSharper.Psi.ExtensionsAPI.Tree;
+@@ -8,10 +8,295 @@ using JetBrains.ReSharper.Psi.ExtensionsAPI.Tree;
  using JetBrains.ReSharper.Psi.Tree;
  using JetBrains.ReSharper.Resources.Shell;
  
@@ -25,7 +25,10 @@ index 1f185efa09c58cd6121ac3014bd03a175ab61b9f..0bc3dbe59f6a2bab443ec3235904e59c
 +		if (declaration is not ClassSpecifier classSpecifier || !classSpecifier.IsValid()
 +			|| classSpecifier.GetLanguageDialect().LanguageKind != CppLanguageKind.CppCx
 +			|| classSpecifier.LBrace == null || classSpecifier.RBrace == null
-+			|| CppClassSymbolUtil.IsCxPartial(classSpecifier.GetClassSymbol()))
++			|| CppClassSymbolUtil.IsCxPartial(classSpecifier.GetClassSymbol())
++			// The grouped entity can retain the first partial body's flags.
++			// The current final body is authoritative for its sealed/final spelling.
++			|| classSpecifier.GetClassSymbol()?.ClassVirtualSpecifiers.IsFinalOrSealed() == true)
 +		{
 +			return null;
 +		}

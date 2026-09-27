@@ -1,0 +1,15 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Types/PickResolveScopeVisitor.cs b/JetBrains.ReSharper.Psi.Cpp.Types/PickResolveScopeVisitor.cs
+index d90c5a0c66dcf37c3b1e80aded800f15b152262b..3fb4cb3bf912a560aaa3ea37eba08eb7feb422ca 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Types/PickResolveScopeVisitor.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Types/PickResolveScopeVisitor.cs
+@@ -60,7 +60,9 @@ internal class PickResolveScopeVisitor : CppAbstractTypeVisitor<ICppScopeLikeRes
+ 	public override ICppScopeLikeResolveEntity Visit(CppNumericType e, Qualifiers quals)
+ 	{
+ 		CppGlobalNamespaceResolveEntity instance = CppGlobalNamespaceResolveEntity.GetInstance(myGlobalNamespaceHint);
+-		if (instance.SymbolCache.GetDialect().LanguageKind != CppLanguageKind.CppCli)
++		// @MOD C++/CX: Primitive member access is resolved against the projected
++		// metadata value type, which supplies ValueType/Object members such as ToString.
++		if (instance.SymbolCache.GetDialect().LanguageKind is not (CppLanguageKind.CppCli or CppLanguageKind.CppCx))
+ 		{
+ 			return null;
+ 		}

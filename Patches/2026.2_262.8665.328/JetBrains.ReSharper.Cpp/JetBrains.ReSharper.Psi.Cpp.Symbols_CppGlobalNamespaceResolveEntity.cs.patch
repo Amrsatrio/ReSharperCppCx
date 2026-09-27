@@ -1,5 +1,5 @@
 diff --git a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppGlobalNamespaceResolveEntity.cs b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppGlobalNamespaceResolveEntity.cs
-index 48097c1db5ec71ee19c5afd7ce86907d331721c4..cf33537281c3848a011d9b387335dbdb36ed9144 100644
+index 48097c1db5ec71ee19c5afd7ce86907d331721c4..1e4738dcd7f2d19f6b8ac96f103e45a18568ccb7 100644
 --- a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppGlobalNamespaceResolveEntity.cs
 +++ b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppGlobalNamespaceResolveEntity.cs
 @@ -71,6 +71,52 @@ public class CppGlobalNamespaceResolveEntity : CppClrNamespaceResolveEntity
@@ -55,3 +55,22 @@ index 48097c1db5ec71ee19c5afd7ce86907d331721c4..cf33537281c3848a011d9b387335dbdb
  	}
  
  	private readonly CppBuiltinsRefs myBuiltinsRefs;
+@@ -111,6 +157,18 @@ public class CppGlobalNamespaceResolveEntity : CppClrNamespaceResolveEntity
+ 		return myBuiltinsRefs;
+ 	}
+ 
++	// @MOD C++/CX: the `default` namespace is implicit in source. Its fundamental
++	// aliases (int8, uint8, int16, ..., float64) participate in global lookup.
++	public override CppSmallList<ICppResolveEntity> ChildByName(CppQualifiedNamePart part, CppLocationAnchor anchor, bool includeReachableButNotVisibleEntities)
++	{
++		CppSmallList<ICppResolveEntity> result = base.ChildByName(part, anchor, includeReachableButNotVisibleEntities);
++		if (result.Count == 0 && SymbolCache.GetDialect().LanguageKind == Language.CppLanguageKind.CppCx && myBuiltinsRefs.cx_default_ns != null)
++		{
++			result = myBuiltinsRefs.cx_default_ns.ChildByName(part, anchor, includeReachableButNotVisibleEntities);
++		}
++		return result;
++	}
++
+ 	public bool HasBuiltin(string name)
+ 	{
+ 		if (mySupportedBuiltinDeclarators.Contains(name))

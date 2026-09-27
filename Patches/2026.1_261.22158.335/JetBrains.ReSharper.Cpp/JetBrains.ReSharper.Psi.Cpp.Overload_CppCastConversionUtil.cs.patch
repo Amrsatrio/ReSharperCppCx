@@ -1,5 +1,5 @@
 diff --git a/JetBrains.ReSharper.Psi.Cpp.Overload/CppCastConversionUtil.cs b/JetBrains.ReSharper.Psi.Cpp.Overload/CppCastConversionUtil.cs
-index f34b5a3bfc13e690cf517438d1bb2d08042a3673..33e46ea391a4f6a85c9524a167ff20de05c71c71 100644
+index f34b5a3bfc13e690cf517438d1bb2d08042a3673..372b8e9ddafe3088f346953cf7fbc78cf543d86c 100644
 --- a/JetBrains.ReSharper.Psi.Cpp.Overload/CppCastConversionUtil.cs
 +++ b/JetBrains.ReSharper.Psi.Cpp.Overload/CppCastConversionUtil.cs
 @@ -24,6 +24,13 @@ public static class CppCastConversionUtil
@@ -16,7 +16,22 @@ index f34b5a3bfc13e690cf517438d1bb2d08042a3673..33e46ea391a4f6a85c9524a167ff20de
  			myCastType = CppConversionParameters.CastKind.CliSafeCast;
  			CppCastConversion cppCastConversion = DoDynamicCast(from, toT);
  			if (cppCastConversion.IsFailure())
-@@ -560,6 +567,13 @@ public static class CppCastConversionUtil
+@@ -549,6 +556,14 @@ public static class CppCastConversionUtil
+ 			}
+ 			if (toT.IsReference() && !toT.IsRefCliTracking)
+ 			{
++				// @MOD C++/CX: value classes have native inline storage. C++/CX also
++				// permits binding the reinterpreted reference to a temporary value.
++				if (myTypeContext.Factory.GetDialect().LanguageKind == CppLanguageKind.CppCx && from.Type.IsCliValueClassType())
++				{
++					return IsMoreOrEquallyQualified(toT.GetReferencedType(), from.Type)
++						? new CppReinterpretCastSucceededConversion(from.Expression, typeAndCategory.Type, cppQualType)
++						: new CppReinterpretCastBadConversion(from.Expression, typeAndCategory.Type, cppQualType, CppReinterpretCastBadConversion.FailureKind.CastsAwayConstness);
++				}
+ 				if (!from.Category.IsGLValue())
+ 				{
+ 					return null;
+@@ -560,6 +575,13 @@ public static class CppCastConversionUtil
  			{
  				return new CppReinterpretCastSucceededConversion(from.Expression, typeAndCategory.Type, cppQualType);
  			}

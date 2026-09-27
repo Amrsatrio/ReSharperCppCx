@@ -1,5 +1,5 @@
 diff --git a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClrNamespaceResolveEntity.cs b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClrNamespaceResolveEntity.cs
-index 6385b46ae42f54d996deb34c948c87533a2942dd..046c7563f690dd8a92a3d22a7ac56c9453963331 100644
+index 6385b46ae42f54d996deb34c948c87533a2942dd..c1fd5c96fd913e74b6e41f131e5458522ea80864 100644
 --- a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClrNamespaceResolveEntity.cs
 +++ b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClrNamespaceResolveEntity.cs
 @@ -87,6 +87,15 @@ public class CppClrNamespaceResolveEntity : CppNamespaceResolveEntity, ICppClrSc
@@ -23,7 +23,7 @@ index 6385b46ae42f54d996deb34c948c87533a2942dd..046c7563f690dd8a92a3d22a7ac56c94
  	}
  
 +
-+	private static bool IsFromPlatformWinmd(IClrDeclaredElement element) // @MOD C++/CX
++	public static bool IsFromPlatformWinmd(IClrDeclaredElement element) // @MOD C++/CX
 +	{
 +		if (element is not ITypeElement typeElement)
 +			return false;

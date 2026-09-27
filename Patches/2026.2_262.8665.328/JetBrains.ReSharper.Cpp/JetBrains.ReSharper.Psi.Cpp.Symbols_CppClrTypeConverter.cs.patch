@@ -1,5 +1,5 @@
 diff --git a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClrTypeConverter.cs b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClrTypeConverter.cs
-index 43543699d5c31ecc57a4590f14e058000f2e621a..c26c84d174a29cefe0ac20867e7ac3798369122e 100644
+index 43543699d5c31ecc57a4590f14e058000f2e621a..7694325cb88b63d722232c2ae39bab2393549877 100644
 --- a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClrTypeConverter.cs
 +++ b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClrTypeConverter.cs
 @@ -8,6 +8,23 @@ using JetBrains.ReSharper.Psi.Cpp.Types;
@@ -78,10 +78,10 @@ index 43543699d5c31ecc57a4590f14e058000f2e621a..c26c84d174a29cefe0ac20867e7ac379
 +				CppQualType primitive = CppPredefinedTypes.GetPredefinedType(predefinedType);
 +				return HasConstModifier(declaredType) ? primitive.WithAppendedCVQuals(CVQualifiers.Const) : primitive;
 +			}
-+			// The metadata placeholder names the native GUID, not a managed value class.
++			// platform.winmd uses this placeholder for vccorlib's __rcGUID_t alias.
 +			if (clrName.FullName == "Platform.Details._GUID")
 +			{
-+				return new CppQualType(cvt.GlobalNamespace.GetBuiltinsRefs().guid, HasConstModifier(declaredType) ? Qualifiers.Const : Qualifiers.None);
++				return CppGenerateImplicitMembersUtil.CopyParameterType(new CppQualType(cvt.GlobalNamespace.GetBuiltinsRefs().guid));
 +			}
 +			ICppClassResolveEntity projected = cvt.GlobalNamespace.GetBuiltinsRefs().GetCppCxProjectedBuiltin(clrName)
 +				?? cvt.LookupCppCxClass(declaredType);
@@ -129,7 +129,7 @@ index 43543699d5c31ecc57a4590f14e058000f2e621a..c26c84d174a29cefe0ac20867e7ac379
  		if (entity.TypeParameters.Count == 0)
  		{
  			myParameterCache = cvt.myParameterCache;
-@@ -153,6 +223,437 @@ public readonly struct CppClrTypeConverter
+@@ -153,6 +223,441 @@ public readonly struct CppClrTypeConverter
  		RegisterGeneric(entity, name);
  	}
  
@@ -492,6 +492,10 @@ index 43543699d5c31ecc57a4590f14e058000f2e621a..c26c84d174a29cefe0ac20867e7ac379
 +					result[new ClrTypeName(projection.Key.Second)] = nativeName;
 +				}
 +			}
++			// The CLR projection table keeps Guid unchanged, while C++/CX exposes Platform::Guid.
++			IClrTypeName guidName = new ClrTypeName("Platform.Guid");
++			result[new ClrTypeName("System.Guid")] = guidName;
++			result[guidName] = guidName;
 +			// The ABI's IReference<T> and the CLR's Nullable<T> both name Platform::IBox<T> in native signatures.
 +			IClrTypeName boxName = new ClrTypeName("Platform.IBox`1");
 +			result[new ClrTypeName("Windows.Foundation.IReference`1")] = boxName;
@@ -567,7 +571,7 @@ index 43543699d5c31ecc57a4590f14e058000f2e621a..c26c84d174a29cefe0ac20867e7ac379
  	public ICppClassResolveEntity LookupClrClass(ITypeElement clrclass)
  	{
  		return LookupClrClass(clrclass, null);
-@@ -182,7 +683,29 @@ public readonly struct CppClrTypeConverter
+@@ -182,7 +687,29 @@ public readonly struct CppClrTypeConverter
  	public ICppGenericParameter LookupGenericParameter(ITypeParameter param)
  	{
  		InitParameterCache();
@@ -598,7 +602,7 @@ index 43543699d5c31ecc57a4590f14e058000f2e621a..c26c84d174a29cefe0ac20867e7ac379
  	}
  
  	public CppQualType ConvertType(IType type)
-@@ -196,6 +719,32 @@ public readonly struct CppClrTypeConverter
+@@ -196,6 +723,32 @@ public readonly struct CppClrTypeConverter
  		return type.Accept(typeVisitor, new TypeConversionContext(nohandle: false, constPtr));
  	}
  
@@ -631,7 +635,7 @@ index 43543699d5c31ecc57a4590f14e058000f2e621a..c26c84d174a29cefe0ac20867e7ac379
  	public CppQualType ConvertFunctionType(IParametersOwner func)
  	{
  		return ConvertFunctionType(func, constPtr: false);
-@@ -203,10 +752,41 @@ public readonly struct CppClrTypeConverter
+@@ -203,10 +756,39 @@ public readonly struct CppClrTypeConverter
  
  	public CppQualType ConvertFunctionType(IParametersOwner func, bool constPtr)
  	{
@@ -658,24 +662,22 @@ index 43543699d5c31ecc57a4590f14e058000f2e621a..c26c84d174a29cefe0ac20867e7ac379
 +			return CppCxxCliPropertyDeclaratorResolveEntityUtil.GetEventRegistrationTokenType(myEntity, TypeFactory);
 +		}
 +		// Do not evaluate projected PSI types first: native views share the CLR decoded-type cache.
-+		IType returnType = GetNativeSignatureType(function as ITypeMember) ?? function.ReturnType; // @MOD C++/CX
-+		CppQualType result = ConvertType(returnType);
-+		return IsCppCxNativeGuidAlias(function, returnType) ? CppGenerateImplicitMembersUtil.CopyParameterType(result) : result;
++		return ConvertType(GetNativeSignatureType(function as ITypeMember) ?? function.ReturnType); // @MOD C++/CX
 +	}
 +
-+	// @MOD C++/CX
-+	internal bool IsCppCxNativeGuidAlias(IParametersOwner function, IType type)
++	// @MOD C++/CX: MSVC projects every one-parameter platform.winmd value
++	// constructor as a converting constructor; WinMD has no explicit-specifier bit.
++	internal bool IsConstructorExplicit(IConstructor constructor)
 +	{
-+		// vccorlib.h uses __rcGUID_t for Guid's native constructor, Equals and conversion.
-+		return TypeFactory.GetDialect().LanguageKind == CppLanguageKind.CppCx
-+			&& type is IDeclaredType declaredType
-+			&& declaredType.GetClrName().FullName == "Platform.Details._GUID"
-+			&& function is ITypeMember member
-+			&& member.GetContainingType()?.GetClrName().FullName == "Platform.Guid";
++		return constructor.Parameters.Count != 1
++			|| TypeFactory.GetDialect().LanguageKind != CppLanguageKind.CppCx
++			|| myEntity is not ICppClassResolveEntity parent
++			|| !parent.GetKey().IsCliValueClass()
++			|| !CppClrNamespaceResolveEntity.IsFromPlatformWinmd(constructor.GetContainingType());
  	}
  
  	public CppQualType ConvertBaseType(IDeclaredType type)
-@@ -224,14 +804,44 @@ public readonly struct CppClrTypeConverter
+@@ -224,11 +806,37 @@ public readonly struct CppClrTypeConverter
  	{
  		CppQualType[] array = new CppQualType[func.Parameters.Count];
  		int num = 0;
@@ -715,14 +717,7 @@ index 43543699d5c31ecc57a4590f14e058000f2e621a..c26c84d174a29cefe0ac20867e7ac379
  			{
  				cppQualType = cppQualType.WithChangedRefFlag(ReferenceFlag.CliTracking);
  			}
-+			if (IsCppCxNativeGuidAlias(func, parameterType)) // @MOD C++/CX
-+			{
-+				cppQualType = CppGenerateImplicitMembersUtil.CopyParameterType(cppQualType);
-+			}
- 			if (decorate)
- 			{
- 				CppQualType namedParameterType = TypeFactory.GetNamedParameterType(CppDecoratedFunctionParameterFactory.CreateResolved(parameter.ShortName, null), cppQualType);
-@@ -333,7 +943,13 @@ public readonly struct CppClrTypeConverter
+@@ -333,7 +941,13 @@ public readonly struct CppClrTypeConverter
  
  	public static CppPredefinedType GetPredefinedType(ITypeElement type, out bool found)
  	{
@@ -737,7 +732,7 @@ index 43543699d5c31ecc57a4590f14e058000f2e621a..c26c84d174a29cefe0ac20867e7ac379
  		{
  			found = false;
  			return CppPredefinedType.Void;
-@@ -374,9 +990,76 @@ public readonly struct CppClrTypeConverter
+@@ -374,9 +988,76 @@ public readonly struct CppClrTypeConverter
  		}
  	}
  
@@ -816,7 +811,7 @@ index 43543699d5c31ecc57a4590f14e058000f2e621a..c26c84d174a29cefe0ac20867e7ac379
  		ICppScopeResolveEntity cppScopeResolveEntity = DoLookupClrNamespace(clrName);
  		if (cppScopeResolveEntity == null)
  		{
-@@ -392,7 +1075,11 @@ public readonly struct CppClrTypeConverter
+@@ -392,7 +1073,11 @@ public readonly struct CppClrTypeConverter
  			{
  				cppClassResolveEntityWithSubstitution.Instantiate(ViewPosForInstantiation());
  			}
@@ -829,7 +824,7 @@ index 43543699d5c31ecc57a4590f14e058000f2e621a..c26c84d174a29cefe0ac20867e7ac379
  			ICppClassResolveEntity cppClassResolveEntity = null;
  			ICppClassResolveEntity cppClassResolveEntity2 = null;
  			foreach (ICppResolveEntity item in cppSmallList)
-@@ -409,10 +1096,14 @@ public readonly struct CppClrTypeConverter
+@@ -409,10 +1094,14 @@ public readonly struct CppClrTypeConverter
  				if (cppClassResolveEntity4 is CppClrClassResolveEntity cppClrClassResolveEntity)
  				{
  					ITypeElement typeElement2 = cppClrClassResolveEntity.GetTypeElement();
@@ -846,7 +841,7 @@ index 43543699d5c31ecc57a4590f14e058000f2e621a..c26c84d174a29cefe0ac20867e7ac379
  					}
  				}
  				else if ((cppClassResolveEntity4.Name.GetGenericParametersIfTemplateId()?.Count ?? 0) == typeName.TypeParametersNumber)
-@@ -420,7 +1111,7 @@ public readonly struct CppClrTypeConverter
+@@ -420,7 +1109,7 @@ public readonly struct CppClrTypeConverter
  					cppClassResolveEntity2 = cppClassResolveEntity3;
  				}
  			}

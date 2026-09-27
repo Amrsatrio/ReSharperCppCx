@@ -1,5 +1,5 @@
 diff --git a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClrUngroupedFunctionDeclarator.cs b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClrUngroupedFunctionDeclarator.cs
-index bf0751201112dbd1c1cfaaa337acee9a60729f05..fb42f29d747f389789509109c78d334a8ccd165d 100644
+index bf0751201112dbd1c1cfaaa337acee9a60729f05..7f54d027ebb4fd15f29ae183b416aea07fad2c06 100644
 --- a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClrUngroupedFunctionDeclarator.cs
 +++ b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClrUngroupedFunctionDeclarator.cs
 @@ -37,7 +37,7 @@ internal sealed class CppClrUngroupedFunctionDeclarator : CppGeneratedFunctionDe
@@ -7,7 +7,7 @@ index bf0751201112dbd1c1cfaaa337acee9a60729f05..fb42f29d747f389789509109c78d334a
  		myElement = constructor;
  		DeclarationSpecifiers = CppClrTypeConverter.CalculateDeclarationSpecifiers(constructor);
 -		myIsExplicit = true;
-+		myIsExplicit = constructor.Parameters.Count != 1 || !cvt.IsCppCxNativeGuidAlias(constructor, constructor.Parameters[0].Type); // @MOD C++/CX
++		myIsExplicit = cvt.IsConstructorExplicit(constructor); // @MOD C++/CX
  		PureVirtualSpecifiers = CppClrTypeConverter.CalculatePureVirtualSpecifiers(parent.ClrDeclaredElement, constructor);
  	}
  

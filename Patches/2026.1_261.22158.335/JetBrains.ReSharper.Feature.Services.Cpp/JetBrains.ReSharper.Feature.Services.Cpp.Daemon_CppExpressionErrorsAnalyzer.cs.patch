@@ -1,14 +1,26 @@
 diff --git a/JetBrains.ReSharper.Feature.Services.Cpp.Daemon/CppExpressionErrorsAnalyzer.cs b/JetBrains.ReSharper.Feature.Services.Cpp.Daemon/CppExpressionErrorsAnalyzer.cs
-index 22b3e8ea65bf3861ce2d82d5bb3a9e44d0f2c932..17849310c2f7a9bc4d6409f83922c7f7cd04c688 100644
+index 22b3e8ea65bf3861ce2d82d5bb3a9e44d0f2c932..c4fe0da56018f5b9622a2c0d547f720d4b17b542 100644
 --- a/JetBrains.ReSharper.Feature.Services.Cpp.Daemon/CppExpressionErrorsAnalyzer.cs
 +++ b/JetBrains.ReSharper.Feature.Services.Cpp.Daemon/CppExpressionErrorsAnalyzer.cs
-@@ -1051,7 +1051,8 @@ public class CppExpressionErrorsAnalyzer : IElementProblemAnalyzer
+@@ -567,9 +567,10 @@ public class CppExpressionErrorsAnalyzer : IElementProblemAnalyzer
+ 				{
+ 					return;
+ 				}
+-				if (dialect.LanguageKind == CppLanguageKind.CppCli)
++				CppLanguageKind languageKind = dialect.LanguageKind;
++				if (languageKind is CppLanguageKind.CppCli or CppLanguageKind.CppCx) // @MOD C++/CX
+ 				{
+-					HashMap<CppNumericTypeKind, ICppClassResolveEntity> cli_system_numtypes = rootResolveCache.GlobalNamespace.GetBuiltinsRefs().cli_system_numtypes;
++					HashMap<CppNumericTypeKind, ICppClassResolveEntity> cli_system_numtypes = rootResolveCache.GlobalNamespace.GetBuiltinsRefs().GetManagedNumTypes(languageKind); // @MOD C++/CX
+ 					if (cli_system_numtypes != null && cli_system_numtypes.ContainsKey(numericType.Kind))
+ 					{
+ 						return;
+@@ -1051,7 +1052,7 @@ public class CppExpressionErrorsAnalyzer : IElementProblemAnalyzer
  		CppViewPos viewPos = CppViewPosHelper.GetViewPos(cast);
  		ICppResolvedTypeFactory verboseTypeFactory = viewPos.ResolveScope().GetVerboseTypeFactory();
  		CppQualType cppQualType = castTypeId.CalculateTypeWithTypeFactory(verboseTypeFactory);
 -		if (CppClassesErrorsAnalyzerUtil.TryHighlightAbstractClassType(consumer, castTypeId, in viewPos, cppQualType, isTypedef: false, isConstructor: false))
-+		if (!CppTreeModificationUtil.IsCxCheckedCastMissingHandle(cast) &&
-+			CppClassesErrorsAnalyzerUtil.TryHighlightAbstractClassType(consumer, castTypeId, in viewPos, cppQualType, isTypedef: false, isConstructor: false))
++		if (!CppTreeModificationUtil.IsCxCheckedCastMissingHandle(cast) && CppClassesErrorsAnalyzerUtil.TryHighlightAbstractClassType(consumer, castTypeId, in viewPos, cppQualType, isTypedef: false, isConstructor: false))
  		{
  			return;
  		}

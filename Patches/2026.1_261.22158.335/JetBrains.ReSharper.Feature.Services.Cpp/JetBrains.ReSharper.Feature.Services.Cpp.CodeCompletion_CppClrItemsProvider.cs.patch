@@ -1,0 +1,52 @@
+diff --git a/JetBrains.ReSharper.Feature.Services.Cpp.CodeCompletion/CppClrItemsProvider.cs b/JetBrains.ReSharper.Feature.Services.Cpp.CodeCompletion/CppClrItemsProvider.cs
+index 2dfa1fa12372395b07578b2d92c55c71a967727c..be1ed3e9c021dea425a6cc7f0a9ef278f932979e 100644
+--- a/JetBrains.ReSharper.Feature.Services.Cpp.CodeCompletion/CppClrItemsProvider.cs
++++ b/JetBrains.ReSharper.Feature.Services.Cpp.CodeCompletion/CppClrItemsProvider.cs
+@@ -198,6 +198,7 @@ internal class CppClrItemsProvider
+ 		CppCodeCompletionContext context = cppItemsCollector.Context;
+ 		IRangeMarker completionReplaceRange = context.CompletionRanges.CreateVisualReplaceRangeMarker();
+ 		bool isNewExpression = IsNewExpression(node);
++		bool isCppCx = context.LanguageDialect.LanguageKind == ReSharper.Psi.Cpp.Language.CppLanguageKind.CppCx; // @MOD C++/CX
+ 		HashSet<string> hashSet = new HashSet<string>();
+ 		foreach (INamespace clrNamespace in clrNamespaces)
+ 		{
+@@ -226,7 +227,7 @@ internal class CppClrItemsProvider
+ 				}
+ 				else
+ 				{
+-					if (typeElement is ICompiledTypeElement { AccessibilityDomain: { DomainType: not AccessibilityDomain.AccessibilityDomainType.PUBLIC } })
++					if (!IsVisibleType(typeElement, isCppCx)) // @MOD C++/CX
+ 					{
+ 						continue;
+ 					}
+@@ -255,6 +256,7 @@ internal class CppClrItemsProvider
+ 		ISymbolScope clrGlobalSymbolsScope = node.GetFileCache().ResolveCache.GlobalNamespace.ClrGlobalSymbolsScope;
+ 		CppImportItemsProvider.QualifiedNameHolder qualifiedNameHolder = default(CppImportItemsProvider.QualifiedNameHolder);
+ 		qualifiedNameHolder.Alloc();
++		bool isCppCx = node.GetFileCache().ResolveCache.TypeFactory.GetDialect().LanguageKind == ReSharper.Psi.Cpp.Language.CppLanguageKind.CppCx; // @MOD C++/CX
+ 		foreach (INamespace clrNamespace in clrNamespaces)
+ 		{
+ 			foreach (IClrDeclaredElement nestedElement in clrNamespace.GetNestedElements(clrGlobalSymbolsScope))
+@@ -274,7 +276,7 @@ internal class CppClrItemsProvider
+ 						Assertion.Fail("namespace nested element should be ITypeElement or INamespace, {0}", nestedElement);
+ 					}
+ 				}
+-				else if (!(typeElement is ICompiledTypeElement { AccessibilityDomain: { DomainType: not AccessibilityDomain.AccessibilityDomainType.PUBLIC } }))
++				else if (IsVisibleType(typeElement, isCppCx)) // @MOD C++/CX
+ 				{
+ 					qualifiedNameHolder.FillFromTypeElement(typeElement);
+ 					output.Add(qualifiedNameHolder.GetHashCode());
+@@ -283,6 +285,13 @@ internal class CppClrItemsProvider
+ 		}
+ 	}
+ 
++	// @MOD C++/CX: platform.winmd encodes native public types as CLR-internal.
++	private static bool IsVisibleType(ITypeElement typeElement, bool isCppCx)
++	{
++		return typeElement is not ICompiledTypeElement { AccessibilityDomain: { DomainType: not AccessibilityDomain.AccessibilityDomainType.PUBLIC } }
++			|| isCppCx && ReSharper.Psi.Cpp.Symbols.CppClrNamespaceResolveEntity.IsFromPlatformWinmd(typeElement);
++	}
++
+ 	public static bool IsValidNameForNamespace(string name)
+ 	{
+ 		return name[0] != '<';

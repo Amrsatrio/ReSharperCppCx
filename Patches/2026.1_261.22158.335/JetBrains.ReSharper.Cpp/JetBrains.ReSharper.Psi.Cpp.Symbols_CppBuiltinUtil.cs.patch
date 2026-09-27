@@ -1,8 +1,48 @@
 diff --git a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppBuiltinUtil.cs b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppBuiltinUtil.cs
-index 3d83ab86edb9f587e2dc31b4c98e002e3759f9bb..0257d7b77a3727390b925209b43ceb362dcf0bc2 100644
+index 3d83ab86edb9f587e2dc31b4c98e002e3759f9bb..8eb6591cbbb89e25f7ce7d157ed6625c9426f829 100644
 --- a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppBuiltinUtil.cs
 +++ b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppBuiltinUtil.cs
-@@ -419,6 +419,19 @@ public static class CppBuiltinUtil
+@@ -19,6 +19,19 @@ namespace JetBrains.ReSharper.Psi.Cpp.Symbols;
+ 
+ public static class CppBuiltinUtil
+ {
++	private sealed class CppCxGuidStorageField : CppGeneratedVariableDeclaratorResolveEntity
++	{
++		public CppCxGuidStorageField(CppClassResolveEntity parent, CppQualifiedId name, CppQualType type)
++			: base(CppGeneratedResolveEntityType.BUILTIN, type, parent, name, CppDeclarationSpecifiers.None, CppLocationAnchor.GeneratedEntity())
++		{
++		}
++
++		public override CppAccessibility GetAccessibility()
++		{
++			return CppAccessibility.PUBLIC;
++		}
++	}
++
+ 	private class IntrinsicWithNamedParameters : CppGeneratedFunctionDeclaratorResolveEntity
+ 	{
+ 		[CanBeNull]
+@@ -390,6 +403,19 @@ public static class CppBuiltinUtil
+ 					GenerateIntegerPackBuiltin(globalNs, tf);
+ 				}
+ 				builtinsRefs.guid = GenerateGUID(globalNs);
++				if (dialect.LanguageKind == CppLanguageKind.CppCx)
++				{
++					// @MOD C++/CX: model compiler-provided GUID types used by vccorlib.h.
++					CppClassResolveEntity storage = CppClassBuilderUtil.GenerateClassResolveEntity(globalNs, new CppQualifiedId("__s_GUID"), CppClassKey.STRUCT);
++					AddDeclaratorThroughPack(storage, new CppCxGuidStorageField(storage, new CppQualifiedId("Data1"), CppPredefinedTypes.ULong));
++					AddDeclaratorThroughPack(storage, new CppCxGuidStorageField(storage, new CppQualifiedId("Data2"), CppPredefinedTypes.UShort));
++					AddDeclaratorThroughPack(storage, new CppCxGuidStorageField(storage, new CppQualifiedId("Data3"), CppPredefinedTypes.UShort));
++					AddDeclaratorThroughPack(storage, new CppCxGuidStorageField(storage, new CppQualifiedId("Data4"),
++						tf.GetArrayType(CppPredefinedTypes.UChar, CppIntegralValues.Int.Create(8))));
++					storage.GetOrCreateConstructors(storage.GetEndLocationAnchor()).AddGroupedDeclarator(
++						CppGenerateImplicitMembersUtil.GenerateDefaultConstructor(storage, tf, null, null));
++					CreateBuiltinTypedef(globalNs, new CppQualifiedId("__rcGUID_t"), CppGenerateImplicitMembersUtil.CopyParameterType(new CppQualType(builtinsRefs.guid)));
++				}
+ 				bool flag = dialect.LanguageKind == CppLanguageKind.CppCli;
+ 				builtinsRefs.std_ns = (flag ? FindOrGenerateNamespace(globalNs, CppQualifiedId.STD_NAME) : GenerateNamespace(globalNs, CppQualifiedId.STD_NAME));
+ 				if (dialect.TypeInfoNamespace == CppTypeInfoNamespace.Global)
+@@ -419,6 +445,19 @@ public static class CppBuiltinUtil
  						builtinsRefs.cli_system_collections_generic_ienumerable = FindClrClassTemplateChild(ns, CppQualifiedId.IENUMERABLE_NAME);
  					}
  				}
@@ -22,7 +62,7 @@ index 3d83ab86edb9f587e2dc31b4c98e002e3759f9bb..0257d7b77a3727390b925209b43ceb36
  			}
  			if (dialect.HasGnuBuiltins)
  			{
-@@ -863,6 +876,30 @@ public static class CppBuiltinUtil
+@@ -863,6 +902,30 @@ public static class CppBuiltinUtil
  		};
  	}
  
