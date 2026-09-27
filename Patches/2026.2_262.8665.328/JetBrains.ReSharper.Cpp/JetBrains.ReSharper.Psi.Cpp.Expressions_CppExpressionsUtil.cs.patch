@@ -1,0 +1,40 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Expressions/CppExpressionsUtil.cs b/JetBrains.ReSharper.Psi.Cpp.Expressions/CppExpressionsUtil.cs
+index e5388d77423b3b3c7f6c2cb7ce4659894be778f3..981070882f17bfa2920da0e2f0b633c76883baf1 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Expressions/CppExpressionsUtil.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Expressions/CppExpressionsUtil.cs
+@@ -514,13 +514,34 @@ public static class CppExpressionsUtil
+ 		{
+ 			return UnaryRequiresOverloading(arg, tc.Factory);
+ 		}
+-		if (arg is ICppResolvedQualifiedReferenceExpression cppResolvedQualifiedReferenceExpression && CheckQualifiedReferenceForMemberType(cppResolvedQualifiedReferenceExpression, out var _, in tc))
++		if (CheckQualifiedReferenceForMemberType(arg, out var _, in tc)) // @MOD Fix RSCPP-15665
+ 		{
+ 			return false;
+ 		}
+ 		return UnaryRequiresOverloading(arg, tc.Factory);
+ 	}
+ 
++	// @MOD Fix RSCPP-15665
++	internal static bool CheckQualifiedReferenceForMemberType(ICppResolvedExpression expression, out CppQualType memberT, in CppTypeContext tc)
++	{
++		if (expression is ICppParenExpression)
++		{
++			if (tc.Factory.GetDialect() is CppMSVCDialect and not CppClangOnWindowsToolset or CustomLanguageDialect { CompilerKind: Rider.Model.RadCompilerKind.MSVC })
++			{
++				while (expression is ICppParenExpression paren)
++				{
++					expression = (ICppResolvedExpression)paren.GetInnerExpression();
++				}
++			}
++		}
++		if (expression is ICppResolvedQualifiedReferenceExpression reference)
++		{
++			return CheckQualifiedReferenceForMemberType(reference, out memberT, in tc);
++		}
++		memberT = CppQualType.EmptyType();
++		return false;
++	}
++
+ 	public static bool CheckQualifiedReferenceForMemberType(ICppResolvedQualifiedReferenceExpression @ref, out CppQualType memberT, in CppTypeContext tc)
+ 	{
+ 		ICppDeclaratorResolveEntity declaratorIfMember = GetDeclaratorIfMember(@ref, in tc);

@@ -1,7 +1,16 @@
 diff --git a/JetBrains.ReSharper.Psi.Cpp.Resolve/CppResolveEngine.cs b/JetBrains.ReSharper.Psi.Cpp.Resolve/CppResolveEngine.cs
-index 295e9720be5d7962b0574e52bc8fe71efe3d37ee..25aa399234cf2f86d063547040a00cc5040fee41 100644
+index 295e9720be5d7962b0574e52bc8fe71efe3d37ee..19e2157fd542fc09fa979c3f9fffbb0286e4734f 100644
 --- a/JetBrains.ReSharper.Psi.Cpp.Resolve/CppResolveEngine.cs
 +++ b/JetBrains.ReSharper.Psi.Cpp.Resolve/CppResolveEngine.cs
+@@ -67,7 +67,7 @@ public class CppResolveEngine
+ 	public CppResolveResult ResolveNonDependentUnaryOperator(ICppResolvedExpression arg, CppOperatorKind kind, FrugalLocalList<ICppFunctionOrTemplateDeclaratorResolveEntity> firstLookupPhaseCandidates)
+ 	{
+ 		bool flag = ((kind == CppOperatorKind.PERC || kind == CppOperatorKind.AND) ? true : false);
+-		if (flag && arg is ICppResolvedQualifiedReferenceExpression cppResolvedQualifiedReferenceExpression && CppExpressionsUtil.CheckQualifiedReferenceForMemberType(cppResolvedQualifiedReferenceExpression, out var memberT, in TypeContext))
++		if (flag && CppExpressionsUtil.CheckQualifiedReferenceForMemberType(arg, out var memberT, in TypeContext)) // @MOD Fix RSCPP-15665
+ 		{
+ 			CppQualType functionType = TypeFactory.GetFunctionType(memberT, EmptyArray<CppQualType>.Instance, CppFunctionFlags.UnspecifiedCallingConvCpuOnly);
+ 			return CppResolveResult.Builtin(new CppBuiltinOperatorResolveEntity(kind, functionType));
 @@ -517,7 +517,8 @@ public class CppResolveEngine
  			return CppResolveResult.NotResolved();
  		}
@@ -32,3 +41,12 @@ index 295e9720be5d7962b0574e52bc8fe71efe3d37ee..25aa399234cf2f86d063547040a00cc5
  			if (cppTypeAndCategory.Type.GetDependentInfo().IsTypeOrUnknownDependent())
  			{
  				return CppResolveResult.NotResolved();
+@@ -590,7 +604,7 @@ public class CppResolveEngine
+ 		{
+ 			return CppResolveEngineImpl.ResolveUnaryReference(unExpr, in TypeContext);
+ 		}
+-		if (unExpr.GetArgument() is ICppResolvedQualifiedReferenceExpression cppResolvedQualifiedReferenceExpression && CppExpressionsUtil.CheckQualifiedReferenceForMemberType(cppResolvedQualifiedReferenceExpression, out var memberT, in TypeContext))
++		if (CppExpressionsUtil.CheckQualifiedReferenceForMemberType(unExpr.GetResolvedArgument(), out var memberT, in TypeContext)) // @MOD Fix RSCPP-15665
+ 		{
+ 			CppQualType functionType = TypeFactory.GetFunctionType(memberT, EmptyArray<CppQualType>.Instance, CppFunctionFlags.UnspecifiedCallingConvCpuOnly);
+ 			return CppResolveResult.Builtin(new CppBuiltinOperatorResolveEntity(operatorKind, functionType));
