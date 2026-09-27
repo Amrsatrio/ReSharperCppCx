@@ -1,21 +1,28 @@
 diff --git a/JetBrains.ReSharper.Feature.Services.Cpp.Daemon/CppExpressionErrorsAnalyzer.cs b/JetBrains.ReSharper.Feature.Services.Cpp.Daemon/CppExpressionErrorsAnalyzer.cs
-index 22b3e8ea65bf3861ce2d82d5bb3a9e44d0f2c932..c4fe0da56018f5b9622a2c0d547f720d4b17b542 100644
+index 22b3e8ea65bf3861ce2d82d5bb3a9e44d0f2c932..c6bed2299a6355b04c3f2f0ee91f84afde55c2ee 100644
 --- a/JetBrains.ReSharper.Feature.Services.Cpp.Daemon/CppExpressionErrorsAnalyzer.cs
 +++ b/JetBrains.ReSharper.Feature.Services.Cpp.Daemon/CppExpressionErrorsAnalyzer.cs
-@@ -567,9 +567,10 @@ public class CppExpressionErrorsAnalyzer : IElementProblemAnalyzer
+@@ -567,9 +567,17 @@ public class CppExpressionErrorsAnalyzer : IElementProblemAnalyzer
  				{
  					return;
  				}
 -				if (dialect.LanguageKind == CppLanguageKind.CppCli)
 +				CppLanguageKind languageKind = dialect.LanguageKind;
-+				if (languageKind is CppLanguageKind.CppCli or CppLanguageKind.CppCx) // @MOD C++/CX
++				// @MOD C++/CX: a resolved projected member is sufficient even when
++				// the numeric metadata map is unavailable in an editor cache snapshot.
++				CppResolveResult.Status? memberStatus = memAccessExpr.Member?.GetCppResolveResult().GetStatus();
++				if (languageKind == CppLanguageKind.CppCx && memberStatus is CppResolveResult.Status.OK or CppResolveResult.Status.MULTIPLE_CANDIDATES)
  				{
 -					HashMap<CppNumericTypeKind, ICppClassResolveEntity> cli_system_numtypes = rootResolveCache.GlobalNamespace.GetBuiltinsRefs().cli_system_numtypes;
-+					HashMap<CppNumericTypeKind, ICppClassResolveEntity> cli_system_numtypes = rootResolveCache.GlobalNamespace.GetBuiltinsRefs().GetManagedNumTypes(languageKind); // @MOD C++/CX
++					return;
++				}
++				if (languageKind is CppLanguageKind.CppCli or CppLanguageKind.CppCx)
++				{
++					HashMap<CppNumericTypeKind, ICppClassResolveEntity> cli_system_numtypes = rootResolveCache.GlobalNamespace.GetBuiltinsRefs().GetManagedNumTypes(languageKind);
  					if (cli_system_numtypes != null && cli_system_numtypes.ContainsKey(numericType.Kind))
  					{
  						return;
-@@ -1051,7 +1052,7 @@ public class CppExpressionErrorsAnalyzer : IElementProblemAnalyzer
+@@ -1051,7 +1059,7 @@ public class CppExpressionErrorsAnalyzer : IElementProblemAnalyzer
  		CppViewPos viewPos = CppViewPosHelper.GetViewPos(cast);
  		ICppResolvedTypeFactory verboseTypeFactory = viewPos.ResolveScope().GetVerboseTypeFactory();
  		CppQualType cppQualType = castTypeId.CalculateTypeWithTypeFactory(verboseTypeFactory);
@@ -24,7 +31,7 @@ index 22b3e8ea65bf3861ce2d82d5bb3a9e44d0f2c932..c4fe0da56018f5b9622a2c0d547f720d
  		{
  			return;
  		}
-@@ -1083,7 +1084,9 @@ public class CppExpressionErrorsAnalyzer : IElementProblemAnalyzer
+@@ -1083,7 +1091,9 @@ public class CppExpressionErrorsAnalyzer : IElementProblemAnalyzer
  			return;
  		}
  		ICppExpressionNode castSourceExpr = conv.SourceExpression as ICppExpressionNode;
