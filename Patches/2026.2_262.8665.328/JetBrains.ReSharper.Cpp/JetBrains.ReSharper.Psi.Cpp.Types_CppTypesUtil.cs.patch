@@ -1,5 +1,5 @@
 diff --git a/JetBrains.ReSharper.Psi.Cpp.Types/CppTypesUtil.cs b/JetBrains.ReSharper.Psi.Cpp.Types/CppTypesUtil.cs
-index 0896db397501f794cdade44d16ccb82bf63ef115..a01f3c7c06e85e4bbab4fff072c42f44d84d7331 100644
+index 0896db397501f794cdade44d16ccb82bf63ef115..bf5ec2dc291254fd8d2276251cd346cff4c5e439 100644
 --- a/JetBrains.ReSharper.Psi.Cpp.Types/CppTypesUtil.cs
 +++ b/JetBrains.ReSharper.Psi.Cpp.Types/CppTypesUtil.cs
 @@ -955,7 +955,7 @@ public static class CppTypesUtil
@@ -130,7 +130,19 @@ index 0896db397501f794cdade44d16ccb82bf63ef115..a01f3c7c06e85e4bbab4fff072c42f44
  			if (cli_system_numtypes != null && cli_system_numtypes.TryGetValue(cppNumericType.Kind, out var value))
  			{
  				return value;
-@@ -6131,7 +6170,8 @@ public static class CppTypesUtil
+@@ -5651,6 +5690,11 @@ public static class CppTypesUtil
+ 	public static CppTypeAndCategory DoNormalConversions(this CppTypeAndCategory t, ICppResolvedTypeFactory typeFactory)
+ 	{
+ 		t = t.DoLvalToRValConv();
++		// @MOD C++/CX: Top-level CV qualification does not qualify the referenced WinRT object
++		if (typeFactory.GetDialect().LanguageKind == CppLanguageKind.CppCx && t.Type.IsCliHandle())
++		{
++			t.Type = t.Type.CVUnqualify();
++		}
+ 		if (!typeFactory.GetDialect().IsHLSL())
+ 		{
+ 			t = t.DoArrayToPtrConv(typeFactory);
+@@ -6131,7 +6175,8 @@ public static class CppTypesUtil
  
  	public static CppCliHandleConversionKind ClassifyCliHandleConversion(CppQualType from, CppQualType to, in CppTypeContext tc, bool allowObject)
  	{
@@ -140,7 +152,7 @@ index 0896db397501f794cdade44d16ccb82bf63ef115..a01f3c7c06e85e4bbab4fff072c42f44
  		{
  			return CppCliHandleConversionKind.No;
  		}
-@@ -6169,7 +6209,13 @@ public static class CppTypesUtil
+@@ -6169,7 +6214,13 @@ public static class CppTypesUtil
  							}
  							return CppCliHandleConversionKind.No;
  						}

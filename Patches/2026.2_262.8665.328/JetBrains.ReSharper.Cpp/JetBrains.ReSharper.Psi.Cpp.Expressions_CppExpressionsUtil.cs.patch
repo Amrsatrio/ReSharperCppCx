@@ -1,5 +1,5 @@
 diff --git a/JetBrains.ReSharper.Psi.Cpp.Expressions/CppExpressionsUtil.cs b/JetBrains.ReSharper.Psi.Cpp.Expressions/CppExpressionsUtil.cs
-index e5388d77423b3b3c7f6c2cb7ce4659894be778f3..981070882f17bfa2920da0e2f0b633c76883baf1 100644
+index e5388d77423b3b3c7f6c2cb7ce4659894be778f3..69fc36e8fd2b3465af8057635ddbbbcaf6d7f8f6 100644
 --- a/JetBrains.ReSharper.Psi.Cpp.Expressions/CppExpressionsUtil.cs
 +++ b/JetBrains.ReSharper.Psi.Cpp.Expressions/CppExpressionsUtil.cs
 @@ -514,13 +514,34 @@ public static class CppExpressionsUtil
@@ -38,3 +38,15 @@ index e5388d77423b3b3c7f6c2cb7ce4659894be778f3..981070882f17bfa2920da0e2f0b633c7
  	public static bool CheckQualifiedReferenceForMemberType(ICppResolvedQualifiedReferenceExpression @ref, out CppQualType memberT, in CppTypeContext tc)
  	{
  		ICppDeclaratorResolveEntity declaratorIfMember = GetDeclaratorIfMember(@ref, in tc);
+@@ -995,6 +1016,11 @@ public static class CppExpressionsUtil
+ 		{
+ 			CppTypeAndCategory typeAndCategory = resolvedLeftArgument.GetTypeAndCategory(tf);
+ 			typeAndCategory.Type = typeAndCategory.Type.GetPointeeIfPointer().ClearRefs();
++			// @MOD C++/CX: Projected enum members operate on the value regardless of top level CV qualification
++			if (tf.GetDialect().LanguageKind == CppLanguageKind.CppCx && typeAndCategory.Type.IsCliEnum())
++			{
++				typeAndCategory.Type = typeAndCategory.Type.CVUnqualify();
++			}
+ 			return typeAndCategory;
+ 		}
+ 		CppResolveResult lookupScopeResolveResult = expr.GetLookupScopeResolveResult();

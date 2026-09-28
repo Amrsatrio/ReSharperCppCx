@@ -1,7 +1,16 @@
 diff --git a/JetBrains.ReSharper.Psi.Cpp.Expressions/CppGetExpressionTypeVisitor.cs b/JetBrains.ReSharper.Psi.Cpp.Expressions/CppGetExpressionTypeVisitor.cs
-index fad3b5812fcae8ab378e94dfbdbb5656fa3ef05a..fa917eddc3e9f36a18cd9b2086a02ead0d14a0c9 100644
+index fad3b5812fcae8ab378e94dfbdbb5656fa3ef05a..771c8d4549f5f7a215a50b308a89295b601a6e27 100644
 --- a/JetBrains.ReSharper.Psi.Cpp.Expressions/CppGetExpressionTypeVisitor.cs
 +++ b/JetBrains.ReSharper.Psi.Cpp.Expressions/CppGetExpressionTypeVisitor.cs
+@@ -274,7 +274,7 @@ internal sealed class CppGetExpressionTypeVisitor : CppAbstractResolvedExpressio
+ 			CppTernaryOperatorConversionResult cppTernaryOperatorConversionResult = cppConversionHelper.ForTernaryOperator(second, third);
+ 			CppTernaryOperatorConversionResult cppTernaryOperatorConversionResult2 = cppConversionHelper.ForTernaryOperator(third, second);
+ 			CppLanguageKind languageKind = viewPos.GetLanguageDialect().LanguageKind;
+-			if ((cppTernaryOperatorConversionResult.CanConvert && cppTernaryOperatorConversionResult2.CanConvert && languageKind != CppLanguageKind.CppCli) || (cppTernaryOperatorConversionResult.CanConvert && cppTernaryOperatorConversionResult.ConversionIsAmbiguous) || (cppTernaryOperatorConversionResult2.CanConvert && cppTernaryOperatorConversionResult2.ConversionIsAmbiguous))
++			if ((cppTernaryOperatorConversionResult.CanConvert && cppTernaryOperatorConversionResult2.CanConvert && languageKind is not (CppLanguageKind.CppCli or CppLanguageKind.CppCx) /*@MOD C++/CX*/) || (cppTernaryOperatorConversionResult.CanConvert && cppTernaryOperatorConversionResult.ConversionIsAmbiguous) || (cppTernaryOperatorConversionResult2.CanConvert && cppTernaryOperatorConversionResult2.ConversionIsAmbiguous))
+ 			{
+ 				return new CppTypeAndCategory(CppQualType.EmptyType(), CppValueCategory.PR_VALUE);
+ 			}
 @@ -622,7 +622,9 @@ internal sealed class CppGetExpressionTypeVisitor : CppAbstractResolvedExpressio
  
  	public override CppTypeAndCategory Visit(ICppResolvedCliTypeIdExpression expr)
