@@ -1,0 +1,27 @@
+diff --git a/JetBrains.ReSharper.Psi.Cpp.Resolve/CppRangeBasedForResolveEngine.cs b/JetBrains.ReSharper.Psi.Cpp.Resolve/CppRangeBasedForResolveEngine.cs
+index 567cfdfd849ef897cd488e90d2f20172468954c1..fd59c638382664dda3e6c7b61a81467a0130e6f4 100644
+--- a/JetBrains.ReSharper.Psi.Cpp.Resolve/CppRangeBasedForResolveEngine.cs
++++ b/JetBrains.ReSharper.Psi.Cpp.Resolve/CppRangeBasedForResolveEngine.cs
+@@ -169,6 +169,22 @@ public sealed class CppRangeBasedForResolveEngine
+ 		}
+ 		if (myForType == CppForStatementKind.MS_FOREACH)
+ 		{
++			// @MOD C++/CX: Support `for each` which uses begin/end
++			if (myTypeContext.Factory.GetDialect().LanguageKind == Language.CppLanguageKind.CppCx && type.IsCliHandle() && type.GetPointeeIfCliHandle().IsCliClassOrInterfaceType())
++			{
++				ICppResolvedExpression cxBegin = ResolveCallToFreeFunction(CppQualifiedName.Create(CppQualifiedId.BEGIN_NAME));
++				if (cxBegin is ICppResolvedCallExpression resolvedBegin && resolvedBegin.GetResolvedOperator().GetStatus() == CppResolveResult.Status.OK)
++				{
++					ICppResolvedExpression cxEnd = ResolveCallToFreeFunction(CppQualifiedName.Create(CppQualifiedId.END_NAME));
++					if (cxEnd is ICppResolvedCallExpression resolvedEnd && resolvedEnd.GetResolvedOperator().GetStatus() == CppResolveResult.Status.OK)
++					{
++						beginExpr = cxBegin;
++						endExpr = cxEnd;
++						kind = CppRangeBasedForResolveKind.UnqualifiedBeginEndCall;
++						return;
++					}
++				}
++			}
+ 			if ((type.IsCliHandle() && type.GetPointeeIfCliHandle().IsCliClassOrInterfaceType()) || type.IsCliClassOrInterfaceType() || type.IsGenericParameterType())
+ 			{
+ 				kind = CppRangeBasedForResolveKind.CliUserDefined;
