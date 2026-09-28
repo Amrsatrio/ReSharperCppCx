@@ -1,5 +1,5 @@
 diff --git a/JetBrains.ReSharper.Psi.Cpp.Resolve/CppResolveEngine.cs b/JetBrains.ReSharper.Psi.Cpp.Resolve/CppResolveEngine.cs
-index a086f6da37e4474bc1588fd02e30e0a1651b333a..0fa1f1fe84614e809da03d7aaaba76bd73c92149 100644
+index a086f6da37e4474bc1588fd02e30e0a1651b333a..781ca69fd31b6fc966ad0d1d4e06bc86652113cb 100644
 --- a/JetBrains.ReSharper.Psi.Cpp.Resolve/CppResolveEngine.cs
 +++ b/JetBrains.ReSharper.Psi.Cpp.Resolve/CppResolveEngine.cs
 @@ -68,7 +68,7 @@ public class CppResolveEngine
@@ -17,11 +17,55 @@ index a086f6da37e4474bc1588fd02e30e0a1651b333a..0fa1f1fe84614e809da03d7aaaba76bd
  		ICppResolvedTypeFactory typeFactory = TypeFactory;
 -		if (typeFactory.GetDialect().LanguageKind == CppLanguageKind.CppCli && CppExpressionsUtil.IsCliEventSubscription(kind, leftOp, out var prop))
 +		CppLanguageKind languageKind = typeFactory.GetDialect().LanguageKind;
-+		if (languageKind is CppLanguageKind.CppCli or CppLanguageKind.CppCx && CppExpressionsUtil.IsCliEventSubscription(kind, leftOp, out var prop))
++		if (languageKind is CppLanguageKind.CppCli or CppLanguageKind.CppCx /*@MOD C++/CX*/ && CppExpressionsUtil.IsCliEventSubscription(kind, leftOp, out var prop))
  		{
  			ICppGroupedFunctionDeclaratorResolveEntity cppGroupedFunctionDeclaratorResolveEntity = CppCxxCliPropertyDeclaratorResolveEntityUtil.ResolveFunction(prop, kind);
  			if (cppGroupedFunctionDeclaratorResolveEntity != null)
-@@ -661,6 +662,19 @@ public class CppResolveEngine
+@@ -648,6 +649,43 @@ public class CppResolveEngine
+ 			}
+ 			return CppResolveResult.NotResolved();
+ 		}
++		// @MOD C++/CX: mixed value/handle equality follows the conversion encoded
++		// by MSVC. A concrete Box<T> is unboxed when possible; otherwise T is
++		// boxed. Target-specific value-to-handle conversions are accepted only
++		// with the handle on the left.
++		if (languageKind == CppLanguageKind.CppCx && kind is CppOperatorKind.EQEQ or CppOperatorKind.EXCLEQ)
++		{
++			CppTypeAndCategory leftType = TypeOf(leftOp);
++			CppTypeAndCategory rightType = TypeOf(rightOp);
++			bool leftIsHandle = leftType.Type.IsCliHandle();
++			bool rightIsHandle = rightType.Type.IsCliHandle();
++			if (leftIsHandle != rightIsHandle)
++			{
++				CppTypeAndCategory handleType = leftIsHandle ? leftType : rightType;
++				CppTypeAndCategory valueType = leftIsHandle ? rightType : leftType;
++				if (valueType.Type.IsBoxable(typeFactory.ResolveCache.GlobalNamespace))
++				{
++					CppExpressionInfo handle = leftIsHandle ? new CppExpressionInfo(leftOp, leftType) : new CppExpressionInfo(rightOp, rightType);
++					CppExpressionInfo value = leftIsHandle ? new CppExpressionInfo(rightOp, rightType) : new CppExpressionInfo(leftOp, leftType);
++					CppImplicitConversionSequence valueToHandle = value.DoConversion(handleType.Type, CppConversionParameters.ForCopyInitDecl, in TypeContext);
++					CppQualType commonType = default(CppQualType);
++					if (valueToHandle is CppStandardConversionSequence { First: { Kind: CppImplicitConversionKind.CliBoxingConversion, TargetType: var boxedTarget } } && CppTypesUtil.AreEqualUnqualifiedTypes(boxedTarget, handleType.Type))
++					{
++						CppImplicitConversionSequence handleToValue = handle.DoConversion(valueType.Type, CppConversionParameters.ForCopyInitDecl, in TypeContext);
++						commonType = handleToValue.IsFailureConversion() ? handleType.Type : valueType.Type;
++					}
++					else if (leftIsHandle && valueToHandle is CppUserDefinedConversionSequence && !valueToHandle.IsFailureConversion())
++					{
++						commonType = handleType.Type;
++					}
++					if (!commonType.IsNullType())
++					{
++						CppQualType functionType = typeFactory.GetFunctionType(CppPredefinedTypes.Bool, new CppQualType[2] { commonType, commonType }, CppFunctionFlags.Cdecl);
++						return CppResolveResult.Builtin(new CppBuiltinOperatorResolveEntity(kind, functionType));
++					}
++				}
++			}
++		}
+ 		if (!CppExpressionsUtil.BinaryRequiresOverloading(leftOp, rightOp, kind, typeFactory))
+ 		{
+ 			CppTypeAndCategory cppTypeAndCategory = TypeOf(leftOp);
+@@ -661,6 +699,19 @@ public class CppResolveEngine
  				}
  				typeAndCategory = CppTypeAndCategory.MakePRValue(cppTypeAndCategory.Type);
  			}
@@ -41,7 +85,7 @@ index a086f6da37e4474bc1588fd02e30e0a1651b333a..0fa1f1fe84614e809da03d7aaaba76bd
  			if (cppTypeAndCategory.Type.GetDependentInfo().IsTypeOrUnknownDependent())
  			{
  				return CppResolveResult.NotResolved();
-@@ -712,7 +726,7 @@ public class CppResolveEngine
+@@ -712,7 +763,7 @@ public class CppResolveEngine
  		{
  			return CppResolveEngineImpl.ResolveUnaryReference(unExpr, in TypeContext);
  		}

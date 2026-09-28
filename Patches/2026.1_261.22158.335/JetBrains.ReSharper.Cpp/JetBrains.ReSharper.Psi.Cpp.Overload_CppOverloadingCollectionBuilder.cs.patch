@@ -1,5 +1,5 @@
 diff --git a/JetBrains.ReSharper.Psi.Cpp.Overload/CppOverloadingCollectionBuilder.cs b/JetBrains.ReSharper.Psi.Cpp.Overload/CppOverloadingCollectionBuilder.cs
-index 4c7a870f45619042640b3407a0771a5885d5222d..1d8af69274510178d114e6f5d1556b5e727dad42 100644
+index 4c7a870f45619042640b3407a0771a5885d5222d..65d1eb409cf7faf23aefceba03fdafb71dbd5881 100644
 --- a/JetBrains.ReSharper.Psi.Cpp.Overload/CppOverloadingCollectionBuilder.cs
 +++ b/JetBrains.ReSharper.Psi.Cpp.Overload/CppOverloadingCollectionBuilder.cs
 @@ -163,7 +163,7 @@ public struct CppOverloadingCollectionBuilder(CppTypeContext tc, ICppTemplateArg
@@ -11,7 +11,26 @@ index 4c7a870f45619042640b3407a0771a5885d5222d..1d8af69274510178d114e6f5d1556b5e
  			{
  				CppCliHandleType cliStringHandleType = factory.GetCliStringHandleType();
  				if (cliStringHandleType != null)
-@@ -602,7 +602,7 @@ public struct CppOverloadingCollectionBuilder(CppTypeContext tc, ICppTemplateArg
+@@ -587,6 +587,18 @@ public struct CppOverloadingCollectionBuilder(CppTypeContext tc, ICppTemplateArg
+ 
+ 		public void AddRelationalCliHandleOverloads(CppOperatorKind kind, ref CppSmallList<CppOverloadingCandidate> output)
+ 		{
++			// @MOD C++/CX
++			ICppResolvedTypeFactory typeFactory = myCandidateBuilder.TypeContext.Factory;
++			CppQualType leftType = myCandidateTypes[0].GetBaseType();
++			CppQualType rightType = myCandidateTypes[1].GetBaseType();
++			if (typeFactory.GetDialect().LanguageKind == CppLanguageKind.CppCx && kind is CppOperatorKind.EQEQ or CppOperatorKind.EXCLEQ && !leftType.IsCliHandle() && rightType.IsCliHandle())
++			{
++				CppConversionParameters parameters = myCandidateBuilder.BuilderParameters.GetParametersForConversions();
++				if (!myCandidateBuilder.CreateCppConversionHelper(parameters).IsCppCxDirectBoxingTarget(leftType, rightType))
++				{
++					return;
++				}
++			}
+ 			bool flag = false;
+ 			bool flag2 = false;
+ 			for (int i = 0; i < myArgs.Length; i++)
+@@ -602,7 +614,7 @@ public struct CppOverloadingCollectionBuilder(CppTypeContext tc, ICppTemplateArg
  				if (flag & flag2)
  				{
  					ICppResolvedTypeFactory factory = myCandidateBuilder.TypeContext.Factory;
@@ -20,7 +39,7 @@ index 4c7a870f45619042640b3407a0771a5885d5222d..1d8af69274510178d114e6f5d1556b5e
  					if (cli_system_object == null)
  					{
  						throw new Exception("one of the args has cli-handle in type, but GlobalNamespace.BuiltinsRefs.cli_system_object is null");
-@@ -1279,7 +1279,7 @@ public struct CppOverloadingCollectionBuilder(CppTypeContext tc, ICppTemplateArg
+@@ -1279,7 +1291,7 @@ public struct CppOverloadingCollectionBuilder(CppTypeContext tc, ICppTemplateArg
  				{
  					isInsideDirectInit = (forceAllowExplicitConversions = true);
  				}
@@ -29,3 +48,12 @@ index 4c7a870f45619042640b3407a0771a5885d5222d..1d8af69274510178d114e6f5d1556b5e
  				{
  					goto IL_0328;
  				}
+@@ -1413,7 +1425,7 @@ public struct CppOverloadingCollectionBuilder(CppTypeContext tc, ICppTemplateArg
+ 				}
+ 			}
+ 		}
+-		if (GetTypeFactory().GetDialect().LanguageKind == CppLanguageKind.CppCli)
++		if (GetTypeFactory().GetDialect().LanguageKind is CppLanguageKind.CppCli or CppLanguageKind.CppCx) // @MOD C++/CX
+ 		{
+ 			ICppClassResolveEntity resolvedClassOrCliHandleTypeEntity2 = toT.GetResolvedClassOrCliHandleTypeEntity();
+ 			if (resolvedClassOrCliHandleTypeEntity2 != null && resolvedClassOrCliHandleTypeEntity != resolvedClassOrCliHandleTypeEntity2 && resolvedClassOrCliHandleTypeEntity2.IsCliManagedClass())

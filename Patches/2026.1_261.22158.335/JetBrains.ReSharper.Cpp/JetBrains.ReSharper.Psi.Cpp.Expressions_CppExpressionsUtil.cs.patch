@@ -1,7 +1,16 @@
 diff --git a/JetBrains.ReSharper.Psi.Cpp.Expressions/CppExpressionsUtil.cs b/JetBrains.ReSharper.Psi.Cpp.Expressions/CppExpressionsUtil.cs
-index 87a8dff16b7c63c28497819255a095da11e9d11e..a6f4f407e59ff0c0808c18f9ec255f30b90455b7 100644
+index 87a8dff16b7c63c28497819255a095da11e9d11e..6f4487bccf9ccd59024722d566bc444e66d76943 100644
 --- a/JetBrains.ReSharper.Psi.Cpp.Expressions/CppExpressionsUtil.cs
 +++ b/JetBrains.ReSharper.Psi.Cpp.Expressions/CppExpressionsUtil.cs
+@@ -450,7 +450,7 @@ public static class CppExpressionsUtil
+ 		}
+ 		CppTypeAndCategory typeAndCategory = leftOp.GetTypeAndCategory(tf);
+ 		CppTypeAndCategory typeAndCategory2 = rightOp.GetTypeAndCategory(tf);
+-		if (!typeAndCategory.Type.IsResolvedClassType() && !typeAndCategory.Type.IsEnum() && !typeAndCategory.Type.IsCliHandleOrGeneric() && !typeAndCategory2.Type.IsResolvedClassType() && !typeAndCategory2.Type.IsEnum() && !typeAndCategory2.Type.IsCliHandleOrGeneric() && (kind != CppOperatorKind.PLUS || languageKind != CppLanguageKind.CppCli || (!IsStringLiteralExpr(leftOp) && !IsStringLiteralExpr(rightOp))))
++		if (!typeAndCategory.Type.IsResolvedClassType() && !typeAndCategory.Type.IsEnum() && !typeAndCategory.Type.IsCliHandleOrGeneric() && !typeAndCategory2.Type.IsResolvedClassType() && !typeAndCategory2.Type.IsEnum() && !typeAndCategory2.Type.IsCliHandleOrGeneric() && (kind != CppOperatorKind.PLUS || languageKind is not (CppLanguageKind.CppCli or CppLanguageKind.CppCx) /*@MOD C++/CX*/ || (!IsStringLiteralExpr(leftOp) && !IsStringLiteralExpr(rightOp))))
+ 		{
+ 			return false;
+ 		}
 @@ -501,13 +501,34 @@ public static class CppExpressionsUtil
  		{
  			return UnaryRequiresOverloading(arg, tc.Factory);
@@ -42,8 +51,8 @@ index 87a8dff16b7c63c28497819255a095da11e9d11e..a6f4f407e59ff0c0808c18f9ec255f30
  		{
  			CppTypeAndCategory typeAndCategory = resolvedLeftArgument.GetTypeAndCategory(tf);
  			typeAndCategory.Type = typeAndCategory.Type.GetPointeeIfPointer().ClearRefs();
-+			// @MOD C++/CX: Projected enum members operate on the value regardless of top level CV qualification
-+			if (tf.GetDialect().LanguageKind == CppLanguageKind.CppCx && typeAndCategory.Type.IsCliEnum())
++			// @MOD C++/CX: Projected primitive and enum members operate on the value regardless of top level CV qualification
++			if (tf.GetDialect().LanguageKind == CppLanguageKind.CppCx && (typeAndCategory.Type.IsArithmetic() || typeAndCategory.Type.IsCliEnum()))
 +			{
 +				typeAndCategory.Type = typeAndCategory.Type.CVUnqualify();
 +			}

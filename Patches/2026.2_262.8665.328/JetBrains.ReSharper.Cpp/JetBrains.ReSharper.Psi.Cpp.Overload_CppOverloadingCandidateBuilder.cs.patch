@@ -1,5 +1,5 @@
 diff --git a/JetBrains.ReSharper.Psi.Cpp.Overload/CppOverloadingCandidateBuilder.cs b/JetBrains.ReSharper.Psi.Cpp.Overload/CppOverloadingCandidateBuilder.cs
-index 024a4d6b066789a50984200c0a9a7bf608d82f56..6165657191fd93597114f905efd19ceac071cdd8 100644
+index 024a4d6b066789a50984200c0a9a7bf608d82f56..9a1d6f90d7e7e395c6b7bcb9013b1d415c4a2b24 100644
 --- a/JetBrains.ReSharper.Psi.Cpp.Overload/CppOverloadingCandidateBuilder.cs
 +++ b/JetBrains.ReSharper.Psi.Cpp.Overload/CppOverloadingCandidateBuilder.cs
 @@ -385,6 +385,48 @@ public struct CppOverloadingCandidateBuilder
@@ -51,26 +51,27 @@ index 024a4d6b066789a50984200c0a9a7bf608d82f56..6165657191fd93597114f905efd19cea
  	private CppOrdinaryOverloadingCandidate BuildOrdinaryCandidateWithCustomInfo(ICppGroupedFunctionDeclaratorResolveEntity candidate, ReadOnlySpan<ICppExpression> args, ICppOverloadingInfoAggregator info, CppOperatorRewriteKind rewriteKind, [CanBeNull] CppImplicitConversionSequence[] conversions)
  	{
  		if (candidate.IsClassMemberDeclaratorOrTemplateDeclarator() && !candidate.IsConstructorDeclarator() && !(candidate is ICppDeductionGuide) && !IsCliStaticOperator(candidate))
-@@ -398,6 +440,18 @@ public struct CppOverloadingCandidateBuilder
+@@ -398,6 +440,19 @@ public struct CppOverloadingCandidateBuilder
  		{
  			return cppOrdinaryOverloadingCandidate;
  		}
-+		if (args.Length == 1 && TypeContext.Factory.GetDialect().LanguageKind == CppLanguageKind.CppCx && IsCxLambdaConstructor(candidate)) // @MOD C++/CX
++		if (args.Length is >= 1 and <= 2 && TypeContext.Factory.GetDialect().LanguageKind == CppLanguageKind.CppCx && IsCxLambdaConstructor(candidate)) // @MOD C++/CX
 +		{
 +			ICppResolvedExpression argument = (ICppResolvedExpression)args[0];
 +			CppQualType parameterType = typeWithUndefinedReturnTypeAndCallingConvention.GetFunctionParameterType(0);
 +			CppImplicitConversionSequence conversion = BuildCxDelegateLambdaConversion(argument, parameterType);
-+			cppOrdinaryOverloadingCandidate.Conversions = new[] { conversion };
-+			if (IsBadOrAmbiguousImplicitConversion(conversion))
++			cppOrdinaryOverloadingCandidate.Conversions = new CppImplicitConversionSequence[args.Length];
++			cppOrdinaryOverloadingCandidate.Conversions[0] = conversion;
++			if (!IsBadOrAmbiguousImplicitConversion(conversion) || !FailCandidateBadConversion(cppOrdinaryOverloadingCandidate, conversion))
 +			{
-+				cppOrdinaryOverloadingCandidate.FailWith(CppOverloadingCandidate.FailureKind.BadConversion, viableWithMsExtension: false);
++				BuildConversionsForArguments(cppOrdinaryOverloadingCandidate, typeWithUndefinedReturnTypeAndCallingConvention, args, nonVariadicParamCount, 0);
 +			}
 +			return cppOrdinaryOverloadingCandidate;
 +		}
  		cppOrdinaryOverloadingCandidate.Conversions = conversions ?? new CppImplicitConversionSequence[args.Length];
  		BuildConversionsForArguments(cppOrdinaryOverloadingCandidate, typeWithUndefinedReturnTypeAndCallingConvention, args, nonVariadicParamCount, 0);
  		return cppOrdinaryOverloadingCandidate;
-@@ -744,7 +798,8 @@ public struct CppOverloadingCandidateBuilder
+@@ -744,7 +799,8 @@ public struct CppOverloadingCandidateBuilder
  	{
  		if (func.DeclarationSpecifiers.IsStatic() && func.Name.IsOperatorIdOrTemplate())
  		{

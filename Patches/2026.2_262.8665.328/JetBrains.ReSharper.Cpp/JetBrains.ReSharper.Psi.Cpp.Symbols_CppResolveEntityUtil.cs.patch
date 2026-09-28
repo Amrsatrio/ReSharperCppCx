@@ -1,7 +1,16 @@
 diff --git a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppResolveEntityUtil.cs b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppResolveEntityUtil.cs
-index fb62f2a3156098b83985b58733b87bd1301fe363..8cb22b3eb6b67b3ed946306f3b21551548bb24ea 100644
+index fb62f2a3156098b83985b58733b87bd1301fe363..a28e32611ee457792195505c0b3b6fd8e5917c76 100644
 --- a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppResolveEntityUtil.cs
 +++ b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppResolveEntityUtil.cs
+@@ -1583,7 +1583,7 @@ public static class CppResolveEntityUtil
+ 			bool flag6 = false;
+ 			foreach (ICppVariableDeclaratorResolveEntity ungroupedDeclarator3 in cppGroupedVariableDeclaratorResolveEntity.GetUngroupedDeclarators())
+ 			{
+-				if (ungroupedDeclarator3 is CppGeneratedVariableDeclaratorResolveEntity cppGeneratedVariableDeclaratorResolveEntity && cppGeneratedVariableDeclaratorResolveEntity.GetEntityType() != CppGeneratedResolveEntityType.IMPORTED_FROM_MODULE)
++				if (ungroupedDeclarator3 is CppGeneratedVariableDeclaratorResolveEntity cppGeneratedVariableDeclaratorResolveEntity && cppGeneratedVariableDeclaratorResolveEntity.GetEntityType() is not CppGeneratedResolveEntityType.CLR /*@MOD C++/CX*/ and not CppGeneratedResolveEntityType.IMPORTED_FROM_MODULE)
+ 				{
+ 					flag5 = true;
+ 				}
 @@ -3733,7 +3733,7 @@ public static class CppResolveEntityUtil
  		CppLanguageDialect languageDialect = ent.GetLanguageDialect();
  		if (ent.IsConstructorDeclarator() || ent.IsDestructorDeclarator())

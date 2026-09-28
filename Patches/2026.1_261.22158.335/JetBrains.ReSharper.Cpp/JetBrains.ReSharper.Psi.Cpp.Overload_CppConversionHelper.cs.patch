@@ -1,21 +1,27 @@
 diff --git a/JetBrains.ReSharper.Psi.Cpp.Overload/CppConversionHelper.cs b/JetBrains.ReSharper.Psi.Cpp.Overload/CppConversionHelper.cs
-index ccc001bbfc3375374ec0e93f6f3dd0a6cb5832a7..ad46f846ad442c67fd78535abce04b25f5abde60 100644
+index ccc001bbfc3375374ec0e93f6f3dd0a6cb5832a7..a26d8ad934d6dbf3dfbb19c66a99cd3b8b13dbe1 100644
 --- a/JetBrains.ReSharper.Psi.Cpp.Overload/CppConversionHelper.cs
 +++ b/JetBrains.ReSharper.Psi.Cpp.Overload/CppConversionHelper.cs
-@@ -41,6 +41,26 @@ public struct CppConversionHelper(in CppTypeContext typeContext, CppConversionPa
+@@ -41,6 +41,32 @@ public struct CppConversionHelper(in CppTypeContext typeContext, CppConversionPa
  	{
  	}
  
 +	// @MOD C++/CX: called only after IsBoxable has accepted the source value.
-+	// Preserve CLI boxing and CX boxing to Object; reuse the existing boxing
-+	// conversion kind so non-boxing overloads keep their preferred ranking.
-+	private bool IsCppCxBoxingTarget(CppQualType from, CppQualType to)
++	// Boxing directly produces Object or the matching IBox<T>/Box<T>; it does
++	// not first produce a fictitious handle to the value class.
++	internal bool IsCppCxDirectBoxingTarget(CppQualType from, CppQualType to)
 +	{
 +		if (TypeFactory.GetDialect().LanguageKind != CppLanguageKind.CppCx)
 +		{
 +			return false;
 +		}
-+		ICppClassResolveEntity box = to.GetCliHandlePointeeType().GetResolvedClassTypeEntity();
++		CppQualType pointeeType = to.GetCliHandlePointeeType();
++		ICppClassResolveEntity objectClass = GetGlobalNamespace().GetBuiltinsRefs().GetManagedObject(CppLanguageKind.CppCx);
++		if (objectClass != null && CppTypesUtil.AreEqualUnqualifiedTypes(pointeeType, new CppQualType(objectClass)))
++		{
++			return true;
++		}
++		ICppClassResolveEntity box = pointeeType.GetResolvedClassTypeEntity();
 +		if (box == null || box.GetLookupParent() != GetGlobalNamespace().GetBuiltinsRefs().cx_platform_ns)
 +		{
 +			return false;
@@ -29,20 +35,20 @@ index ccc001bbfc3375374ec0e93f6f3dd0a6cb5832a7..ad46f846ad442c67fd78535abce04b25
  	/// If a conversion exists, this routine will return the standard conversion sequence required to perform this
  	/// conversion. Otherwise, this routine will return null.
  	public CppImplicitConversionSequence TryFromStandardConversion(CppExpressionInfo from, CppQualType toT)
-@@ -75,7 +95,11 @@ public struct CppConversionHelper(in CppTypeContext typeContext, CppConversionPa
+@@ -75,7 +101,11 @@ public struct CppConversionHelper(in CppTypeContext typeContext, CppConversionPa
  		if (flag2)
  		{
  			cppImplicitConversionKind = CppImplicitConversionKind.CliBoxingConversion;
 -			from.Type = new CppQualType(TypeFactory.GetCliHandleType(from.Type.ClearCVQuals()));
 +			// @MOD C++/CX: boxing T produces IBox<T>, not a fictitious T^
 +			// followed by numeric conversion to an unrelated IBox<U>.
-+			from.Type = IsCppCxBoxingTarget(from.Type, toT)
++			from.Type = IsCppCxDirectBoxingTarget(from.Type, toT)
 +				? toT.CVUnqualify().WithInputQualifiers(InputQualifiers.Empty)
 +				: new CppQualType(TypeFactory.GetCliHandleType(from.Type.ClearCVQuals()));
  		}
  		else if (flag3 && !from.Type.IsFunctionType() && !from.Type.IsArray())
  		{
-@@ -422,7 +446,7 @@ public struct CppConversionHelper(in CppTypeContext typeContext, CppConversionPa
+@@ -422,7 +452,7 @@ public struct CppConversionHelper(in CppTypeContext typeContext, CppConversionPa
  				return new CppBadConversionSequence(CppBadConversionSequence.FailureStatus.GeneralFailure, ReferenceFlag.Empty, typeAndCategory.Type, toT, expression).AttachAggregateInitInfo(cppAggregateInitializationInfo);
  			}
  		}
@@ -51,7 +57,19 @@ index ccc001bbfc3375374ec0e93f6f3dd0a6cb5832a7..ad46f846ad442c67fd78535abce04b25
  		{
  			if (!flag)
  			{
-@@ -1097,7 +1121,9 @@ public struct CppConversionHelper(in CppTypeContext typeContext, CppConversionPa
+@@ -1045,6 +1075,11 @@ public struct CppConversionHelper(in CppTypeContext typeContext, CppConversionPa
+ 			}
+ 			return new CppBadConversionSequence(CppBadConversionSequence.FailureStatus.GeneralFailure, ReferenceFlag.Empty, from.Type, toT, from.Expression);
+ 		}
++		// @MOD C++/CX
++		if (TypeFactory.GetDialect().LanguageKind == CppLanguageKind.CppCx && from.Type.IsCliStringHandleType() && toT.IsCliStringHandleType())
++		{
++			return CppStandardConversionSequence.CreateConversion(from.Expression, from.Type, new CppStandardConversionPart(from.Type, CppImplicitConversionKind.Identity), new CppStandardConversionPart(toT, CppImplicitConversionKind.Identity), new CppStandardConversionPart(toT, CppImplicitConversionKind.Identity), myParams.AllowExplicitConversions);
++		}
+ 		if (toT.IsResolvedClassType() && from.Type.IsResolvedClassType())
+ 		{
+ 			if (CppTypesUtil.AreEqualUnqualifiedTypes(from.Type, toT))
+@@ -1097,7 +1132,9 @@ public struct CppConversionHelper(in CppTypeContext typeContext, CppConversionPa
  
  	private bool LanguageIsCLI()
  	{

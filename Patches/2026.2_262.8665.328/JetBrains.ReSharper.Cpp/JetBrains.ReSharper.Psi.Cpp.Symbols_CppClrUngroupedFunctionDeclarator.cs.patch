@@ -1,5 +1,5 @@
 diff --git a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClrUngroupedFunctionDeclarator.cs b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClrUngroupedFunctionDeclarator.cs
-index bf0751201112dbd1c1cfaaa337acee9a60729f05..7f54d027ebb4fd15f29ae183b416aea07fad2c06 100644
+index bf0751201112dbd1c1cfaaa337acee9a60729f05..c2cd10829bc0e6b49259d19f50bfae96770f510f 100644
 --- a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClrUngroupedFunctionDeclarator.cs
 +++ b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClrUngroupedFunctionDeclarator.cs
 @@ -37,7 +37,7 @@ internal sealed class CppClrUngroupedFunctionDeclarator : CppGeneratedFunctionDe
@@ -11,16 +11,21 @@ index bf0751201112dbd1c1cfaaa337acee9a60729f05..7f54d027ebb4fd15f29ae183b416aea0
  		PureVirtualSpecifiers = CppClrTypeConverter.CalculatePureVirtualSpecifiers(parent.ClrDeclaredElement, constructor);
  	}
  
-@@ -46,7 +46,7 @@ internal sealed class CppClrUngroupedFunctionDeclarator : CppGeneratedFunctionDe
+@@ -46,7 +46,12 @@ internal sealed class CppClrUngroupedFunctionDeclarator : CppGeneratedFunctionDe
  	{
  		myElement = function;
  		DeclarationSpecifiers = CppClrTypeConverter.CalculateDeclarationSpecifiers(function);
 -		PureVirtualSpecifiers = CppClrTypeConverter.CalculatePureVirtualSpecifiers(parent.ClrDeclaredElement, function);
++		// @MOD C++/CX: Platform::Object::ToString is the one Object method that ref classes may override
++		if (cvt.TypeFactory.GetDialect().LanguageKind == Language.CppLanguageKind.CppCx && parent.GetBuiltinClass() == ICppClrClassResolveEntity.BuiltinClass.Object && function.ShortName == "ToString" && function.Parameters.Count == 0)
++		{
++			DeclarationSpecifiers |= CppDeclarationSpecifiers.Virtual;
++		}
 +		PureVirtualSpecifiers = CalculatePureVirtualSpecifiers(parent.ClrDeclaredElement, function, in cvt); // @MOD C++/CX
  		if (name.IsDestructorTag())
  		{
  			PureVirtualSpecifiers &= ~CppPureVirtualSpecifiers.Sealed;
-@@ -57,9 +57,9 @@ internal sealed class CppClrUngroupedFunctionDeclarator : CppGeneratedFunctionDe
+@@ -57,9 +62,9 @@ internal sealed class CppClrUngroupedFunctionDeclarator : CppGeneratedFunctionDe
  		: base(CppGeneratedResolveEntityType.CLR, cvt.ConvertFunctionType(conv), parent, new CppConversionId(cvt.ConvertType(conv.ReturnType)), CppLocationAnchor.GeneratedEntity())
  	{
  		myElement = conv;
@@ -32,7 +37,7 @@ index bf0751201112dbd1c1cfaaa337acee9a60729f05..7f54d027ebb4fd15f29ae183b416aea0
  	}
  
  	public CppClrUngroupedFunctionDeclarator(CppClrClassResolveEntity parent, ISignOperator conv, in CppClrTypeConverter cvt)
-@@ -67,7 +67,7 @@ internal sealed class CppClrUngroupedFunctionDeclarator : CppGeneratedFunctionDe
+@@ -67,7 +72,7 @@ internal sealed class CppClrUngroupedFunctionDeclarator : CppGeneratedFunctionDe
  	{
  		myElement = conv;
  		DeclarationSpecifiers = CppClrTypeConverter.CalculateDeclarationSpecifiers(conv);
@@ -41,7 +46,7 @@ index bf0751201112dbd1c1cfaaa337acee9a60729f05..7f54d027ebb4fd15f29ae183b416aea0
  	}
  
  	public CppClrUngroupedFunctionDeclarator(CppCxxCliClrPropertyResolveEntity parent, IAccessor accessor, in CppClrTypeConverter cvt)
-@@ -75,7 +75,15 @@ internal sealed class CppClrUngroupedFunctionDeclarator : CppGeneratedFunctionDe
+@@ -75,7 +80,15 @@ internal sealed class CppClrUngroupedFunctionDeclarator : CppGeneratedFunctionDe
  	{
  		myElement = accessor;
  		DeclarationSpecifiers = CppClrTypeConverter.CalculateDeclarationSpecifiers(accessor);
@@ -58,7 +63,7 @@ index bf0751201112dbd1c1cfaaa337acee9a60729f05..7f54d027ebb4fd15f29ae183b416aea0
  	}
  
  	public override CppAccessibility GetAccessibility()
-@@ -109,6 +117,12 @@ internal sealed class CppClrUngroupedFunctionDeclarator : CppGeneratedFunctionDe
+@@ -109,6 +122,12 @@ internal sealed class CppClrUngroupedFunctionDeclarator : CppGeneratedFunctionDe
  			{
  				cvt = new CppClrTypeConverter(cvt, entity, Name);
  			}

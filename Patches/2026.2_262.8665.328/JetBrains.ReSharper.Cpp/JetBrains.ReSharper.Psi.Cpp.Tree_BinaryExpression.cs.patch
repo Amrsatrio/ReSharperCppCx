@@ -1,8 +1,8 @@
 diff --git a/JetBrains.ReSharper.Psi.Cpp.Tree/BinaryExpression.cs b/JetBrains.ReSharper.Psi.Cpp.Tree/BinaryExpression.cs
-index 68203daf92763ce83bf312345031703d97e12d30..4ee2d4c8c6aebc15628b13a53434eccd1e467778 100644
+index 68203daf92763ce83bf312345031703d97e12d30..9ddc5d5f4629e2dc6f839c70df0b5184f41c9588 100644
 --- a/JetBrains.ReSharper.Psi.Cpp.Tree/BinaryExpression.cs
 +++ b/JetBrains.ReSharper.Psi.Cpp.Tree/BinaryExpression.cs
-@@ -137,11 +137,23 @@ public sealed class BinaryExpression : CppExpressionNodeWithCachedDepInfo, ICppR
+@@ -137,12 +137,60 @@ public sealed class BinaryExpression : CppExpressionNodeWithCachedDepInfo, ICppR
  			return;
  		}
  		ICppResolvedTypeFactory typeFactory = this.GetTypeFactory();
@@ -26,5 +26,42 @@ index 68203daf92763ce83bf312345031703d97e12d30..4ee2d4c8c6aebc15628b13a53434eccd
 -		CppTypeContext tc = new CppTypeContext(GetViewPos(), typeFactory);
 +		// CppTypeContext tc = new CppTypeContext(GetViewPos(), typeFactory);
  		ICppResolvedExpression resolvedRightArgument = GetResolvedRightArgument();
++		// @MOD C++/CX
++		if (kind == CppLanguageKind.CppCx && operatorKind is CppOperatorKind.EQEQ or CppOperatorKind.EXCLEQ)
++		{
++			CppTypeAndCategory leftType = leftOperand.GetTypeAndCategory(typeFactory);
++			CppTypeAndCategory rightType = resolvedRightArgument.GetTypeAndCategory(typeFactory);
++			bool leftIsHandle = leftType.Type.IsCliHandle();
++			bool rightIsHandle = rightType.Type.IsCliHandle();
++			if (leftIsHandle != rightIsHandle)
++			{
++				CppTypeAndCategory handleType = leftIsHandle ? leftType : rightType;
++				CppTypeAndCategory valueType = leftIsHandle ? rightType : leftType;
++				if (valueType.Type.IsBoxable(typeFactory.ResolveCache.GlobalNamespace))
++				{
++					CppConversionParameters forCopyInitDecl = CppConversionParameters.ForCopyInitDecl;
++					CppExpressionInfo handle = leftIsHandle ? new CppExpressionInfo(leftOperand, leftType) : new CppExpressionInfo(resolvedRightArgument, rightType);
++					CppExpressionInfo value = leftIsHandle ? new CppExpressionInfo(resolvedRightArgument, rightType) : new CppExpressionInfo(leftOperand, leftType);
++					CppImplicitConversionSequence valueToHandle = value.DoConversion(handleType.Type, forCopyInitDecl, in tc, builderParams.InfoAggregatorFactory);
++					CppQualType commonType = default(CppQualType);
++					if (valueToHandle is CppStandardConversionSequence { First: { Kind: CppImplicitConversionKind.CliBoxingConversion, TargetType: var boxedTarget } } && CppTypesUtil.AreEqualUnqualifiedTypes(boxedTarget, handleType.Type))
++					{
++						CppImplicitConversionSequence handleToValue = handle.DoConversion(valueType.Type, forCopyInitDecl, in tc, builderParams.InfoAggregatorFactory);
++						commonType = handleToValue.IsFailureConversion() ? handleType.Type : valueType.Type;
++					}
++					else if (leftIsHandle && valueToHandle is CppUserDefinedConversionSequence && !valueToHandle.IsFailureConversion())
++					{
++						commonType = handleType.Type;
++					}
++					if (!commonType.IsNullType())
++					{
++						new CppExpressionInfo(leftOperand, leftType).DoConversion(commonType, forCopyInitDecl, in tc, builderParams.InfoAggregatorFactory).TraverseConversion(visitor);
++						new CppExpressionInfo(resolvedRightArgument, rightType).DoConversion(commonType, forCopyInitDecl, in tc, builderParams.InfoAggregatorFactory).TraverseConversion(visitor);
++						return;
++					}
++				}
++			}
++		}
  		if (!CppExpressionsUtil.BinaryRequiresOverloading(leftOperand, resolvedRightArgument, operatorKind, typeFactory))
  		{
+ 			CppResolveResult resolvedOperator = GetResolvedOperator();

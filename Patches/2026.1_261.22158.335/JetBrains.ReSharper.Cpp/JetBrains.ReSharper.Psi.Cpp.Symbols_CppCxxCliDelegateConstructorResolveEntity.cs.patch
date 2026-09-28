@@ -1,5 +1,5 @@
 diff --git a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppCxxCliDelegateConstructorResolveEntity.cs b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppCxxCliDelegateConstructorResolveEntity.cs
-index 48e18581741bc17e8ac2ecacbe9da5582319cfdd..ed581931ea5a0b651df6d5f91a314a2c48bb6e8f 100644
+index 48e18581741bc17e8ac2ecacbe9da5582319cfdd..ed4faa9320403d16e34fc7b47afed64f7206b67d 100644
 --- a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppCxxCliDelegateConstructorResolveEntity.cs
 +++ b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppCxxCliDelegateConstructorResolveEntity.cs
 @@ -2,6 +2,7 @@ using System;
@@ -20,7 +20,52 @@ index 48e18581741bc17e8ac2ecacbe9da5582319cfdd..ed581931ea5a0b651df6d5f91a314a2c
  	}
  
  	private static class CliDelegateConstructor
-@@ -108,13 +110,20 @@ public class CppCxxCliDelegateConstructorResolveEntity : ICppRawDeclaratorResolv
+@@ -82,6 +84,15 @@ public class CppCxxCliDelegateConstructorResolveEntity : ICppRawDeclaratorResolv
+ 
+ 	public virtual int GetFirstDefaultArgIndex()
+ 	{
++		if (myParent.GetTypeFactory().GetDialect().LanguageKind == CppLanguageKind.CppCx) // @MOD C++/CX
++		{
++			return ConstructorType switch
++			{
++				CtorType.CX_LAMBDA or CtorType.GLOBAL_FUNC_CDECL or CtorType.GLOBAL_FUNC_STDCALL => 1,
++				CtorType.REF_CLASS_MEMBER_FUNC or CtorType.VALUE_CLASS_MEMBER_FUNC => 2,
++				_ => int.MaxValue
++			};
++		}
+ 		return int.MaxValue;
+ 	}
+ 
+@@ -100,6 +111,28 @@ public class CppCxxCliDelegateConstructorResolveEntity : ICppRawDeclaratorResolv
+ 		return false;
+ 	}
+ 
++	// @MOD C++/CX
++	private CppQualType GetCallbackContextType(ICppResolvedTypeFactory tf)
++	{
++		CppNamespaceResolveEntity platform = CppGlobalNamespaceResolveEntity.GetInstance(myParent).GetBuiltinsRefs().cx_platform_ns;
++		if (platform == null)
++			return new CppQualType(CppUnknownType.LookupFailure);
++		Lookup.CppLookupResult lookup = Lookup.CppLookup.SimpleLookup(new CppViewPos(platform, CppLocationAnchor.BottomMost(), null), CppQualifiedName.Create(new CppQualifiedId("CallbackContext")), CppClassTag.NO_TAG);
++		return lookup.LookupResultToQualType(tf);
++	}
++
++	// @MOD C++/CX
++	private CppQualType[] AddCppCxContextParameters(CppQualType[] parameters, ICppResolvedTypeFactory tf)
++	{
++		bool memberTarget = ConstructorType is CtorType.REF_CLASS_MEMBER_FUNC or CtorType.VALUE_CLASS_MEMBER_FUNC;
++		int index = parameters.Length;
++		Array.Resize(ref parameters, index + (memberTarget ? 2 : 1));
++		parameters[index] = GetCallbackContextType(tf);
++		if (memberTarget)
++			parameters[index + 1] = CppPredefinedTypes.Bool;
++		return parameters;
++	}
++
+ 	public virtual CppQualType GetCppType(ICppResolvedTypeFactory typeIntern)
+ 	{
+ 		return typeIntern.GetCachedType(this);
+@@ -108,13 +141,20 @@ public class CppCxxCliDelegateConstructorResolveEntity : ICppRawDeclaratorResolv
  	public virtual CppQualType ResolveType(ICppResolvedTypeFactory tf)
  	{
  		CppQualType cppType = ((ICppDeclaratorResolveEntity)((ICppDeclaratorResolveEntityPack)myParent.ChildByName(CppOperatorId.Create(CppOperatorKind.PAREN), myParent.GetEndLocationAnchor())[0]).GetGroupedEntities().Single()).GetCppType(tf);
@@ -38,29 +83,29 @@ index 48e18581741bc17e8ac2ecacbe9da5582319cfdd..ed581931ea5a0b651df6d5f91a314a2c
  		{
  			bool changed3 = false;
 -			cppType = cppType.ChangeCallingConvention(CppCallingConvention.CLRCALL, CppDecoratedCallingConvention.EXPLICIT_CLRCALL, tf, ref changed3);
-+			cppType = cppType.ChangeCallingConvention(invokeConvention, CppDecoratedCallingConvention.EXPLICIT_CLRCALL, tf, ref changed3); // @MOD C++/CX
++			cppType = cppType.ChangeCallingConvention(invokeConvention /*@MOD C++/CX*/, CppDecoratedCallingConvention.EXPLICIT_CLRCALL, tf, ref changed3);
  			paramTypes = new CppQualType[1]
  			{
  				new CppQualType(tf.GetPointerType(cppType))
-@@ -124,7 +133,7 @@ public class CppCxxCliDelegateConstructorResolveEntity : ICppRawDeclaratorResolv
+@@ -124,7 +164,7 @@ public class CppCxxCliDelegateConstructorResolveEntity : ICppRawDeclaratorResolv
  		case CtorType.GLOBAL_FUNC_CDECL:
  		{
  			bool changed2 = false;
 -			cppType = cppType.ChangeCallingConvention(CppCallingConvention.CLRCALL, CppDecoratedCallingConvention.EXPLICIT_CDECL, tf, ref changed2);
-+			cppType = cppType.ChangeCallingConvention(invokeConvention, CppDecoratedCallingConvention.EXPLICIT_CDECL, tf, ref changed2); // @MOD C++/CX
++			cppType = cppType.ChangeCallingConvention(invokeConvention /*@MOD C++/CX*/, CppDecoratedCallingConvention.EXPLICIT_CDECL, tf, ref changed2);
  			paramTypes = new CppQualType[1]
  			{
  				new CppQualType(tf.GetPointerType(cppType))
-@@ -134,7 +143,7 @@ public class CppCxxCliDelegateConstructorResolveEntity : ICppRawDeclaratorResolv
+@@ -134,7 +174,7 @@ public class CppCxxCliDelegateConstructorResolveEntity : ICppRawDeclaratorResolv
  		case CtorType.GLOBAL_FUNC_STDCALL:
  		{
  			bool changed = false;
 -			cppType = cppType.ChangeCallingConvention(CppCallingConvention.CLRCALL, CppDecoratedCallingConvention.EXPLICIT_STDCALL, tf, ref changed);
-+			cppType = cppType.ChangeCallingConvention(invokeConvention, CppDecoratedCallingConvention.EXPLICIT_STDCALL, tf, ref changed); // @MOD C++/CX
++			cppType = cppType.ChangeCallingConvention(invokeConvention /*@MOD C++/CX*/, CppDecoratedCallingConvention.EXPLICIT_STDCALL, tf, ref changed);
  			paramTypes = new CppQualType[1]
  			{
  				new CppQualType(tf.GetPointerType(cppType))
-@@ -177,7 +186,9 @@ public class CppCxxCliDelegateConstructorResolveEntity : ICppRawDeclaratorResolv
+@@ -177,7 +217,9 @@ public class CppCxxCliDelegateConstructorResolveEntity : ICppRawDeclaratorResolv
  			{
  				cppQualType = cppQualType.GetCliHandlePointeeType();
  			}
@@ -71,15 +116,17 @@ index 48e18581741bc17e8ac2ecacbe9da5582319cfdd..ed581931ea5a0b651df6d5f91a314a2c
  			paramTypes = new CppQualType[1]
  			{
  				new CppQualType(tf.GetMemberPointerType(cppQualType, functionType))
-@@ -185,6 +196,10 @@ public class CppCxxCliDelegateConstructorResolveEntity : ICppRawDeclaratorResolv
+@@ -185,6 +227,12 @@ public class CppCxxCliDelegateConstructorResolveEntity : ICppRawDeclaratorResolv
  			break;
  		}
  		}
 -		return tf.GetFunctionType(CppQualType.EmptyType(), paramTypes, new CppFunctionFlags(CppEllipsisKind.None, CppDecoratedCallingConvention.EXPLICIT_CLRCALL, CliDelegateConstructor.RestrictionSpecifiers, FuncRefQualifier.Empty));
 +		// @MOD C++/CX
-+		CppDecoratedCallingConvention convention = isCx
-+			? new CppDecoratedCallingConvention(false, tf.GetDialect().DefaultCtorDtorCallingConvention)
-+			: CppDecoratedCallingConvention.EXPLICIT_CLRCALL;
++		if (isCx && ConstructorType is CtorType.CX_LAMBDA or CtorType.GLOBAL_FUNC_CDECL or CtorType.GLOBAL_FUNC_STDCALL or CtorType.REF_CLASS_MEMBER_FUNC or CtorType.VALUE_CLASS_MEMBER_FUNC)
++		{
++			paramTypes = AddCppCxContextParameters(paramTypes, tf);
++		}
++		CppDecoratedCallingConvention convention = isCx ? new CppDecoratedCallingConvention(false, tf.GetDialect().DefaultCtorDtorCallingConvention) : CppDecoratedCallingConvention.EXPLICIT_CLRCALL;
 +		return tf.GetFunctionType(CppQualType.EmptyType(), paramTypes, new CppFunctionFlags(CppEllipsisKind.None, convention, CliDelegateConstructor.RestrictionSpecifiers, FuncRefQualifier.Empty));
  	}
  }

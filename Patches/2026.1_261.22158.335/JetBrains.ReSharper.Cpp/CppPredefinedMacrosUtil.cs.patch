@@ -1,5 +1,5 @@
 diff --git a/CppPredefinedMacrosUtil.cs b/CppPredefinedMacrosUtil.cs
-index 6f65c8a048d7a89d6321689e8d0d616e5118fb4d..b5f96489381ffee82aa00ba5c22e17d6abae0721 100644
+index 6f65c8a048d7a89d6321689e8d0d616e5118fb4d..3f30a6239583ad6e918f2edd8cedec89bea4ca7a 100644
 --- a/CppPredefinedMacrosUtil.cs
 +++ b/CppPredefinedMacrosUtil.cs
 @@ -115,6 +115,8 @@ public static class CppPredefinedMacrosUtil
@@ -11,10 +11,11 @@ index 6f65c8a048d7a89d6321689e8d0d616e5118fb4d..b5f96489381ffee82aa00ba5c22e17d6
  		public static readonly CppPPDefineSymbol __cplusplus_199711L = CppPPDefineSymbolUtil.ParsePredefinedMacro("__cplusplus=199711L");
  
  		public static readonly CppPPDefineSymbol __cplusplus_201402L = CppPPDefineSymbolUtil.ParsePredefinedMacro("__cplusplus=201402L");
-@@ -563,6 +565,10 @@ public static class CppPredefinedMacrosUtil
+@@ -563,6 +565,11 @@ public static class CppPredefinedMacrosUtil
  		{
  			ProcessForcedInclude(state, options, globalCache, "cuda_runtime.h", isUEForcedIncludeCacheApplicable: false, ref pchIncluded);
  		}
++		// @MOD C++/CX
 +		if (state.LanguageDialect.LanguageKind == CppLanguageKind.CppCx && !props.ForcedIncludes.Contains("vccorlib.h"))
 +		{
 +			ProcessForcedInclude(state, options, globalCache, "vccorlib.h", isUEForcedIncludeCacheApplicable: false, ref pchIncluded);
@@ -22,7 +23,7 @@ index 6f65c8a048d7a89d6321689e8d0d616e5118fb4d..b5f96489381ffee82aa00ba5c22e17d6
  		bool isUEForcedIncludeCacheApplicable = true;
  		foreach (string forcedInclude in props.ForcedIncludes)
  		{
-@@ -860,6 +866,10 @@ public static class CppPredefinedMacrosUtil
+@@ -860,6 +867,10 @@ public static class CppPredefinedMacrosUtil
  			result.ProcessDefine(CppPredefinedMacros.MANAGED);
  			result.ProcessDefine(CppPredefinedMacros.__cplusplus_cli_200406);
  		}

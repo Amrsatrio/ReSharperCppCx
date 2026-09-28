@@ -1,0 +1,38 @@
+diff --git a/JetBrains.ReSharper.Feature.Services.Cpp.Search/CppLanguageReferenceSelector.cs b/JetBrains.ReSharper.Feature.Services.Cpp.Search/CppLanguageReferenceSelector.cs
+index 21d99e75229938aaa6375929fe8f04c55007a5cc..c8c60065adf4c5fe900f8d666a02777b5b82c695 100644
+--- a/JetBrains.ReSharper.Feature.Services.Cpp.Search/CppLanguageReferenceSelector.cs
++++ b/JetBrains.ReSharper.Feature.Services.Cpp.Search/CppLanguageReferenceSelector.cs
+@@ -32,6 +32,11 @@ public class CppLanguageReferenceSelector : ILanguageReferenceSelector
+ 	{
+ 		ITreeNode treeNode = reference.GetTreeNode();
+ 		IPsiServices psiServices = treeNode.GetPsiServices();
++		// @MOD CLI/CX; CX-ONLY
++		if (preferenceKind == ReferencePreferenceKind.ToDeclaration && treeNode is NewExpression newExpression && newExpression.GetFileCache().ResolveCache.TypeFactory.GetDialect().LanguageKind == CppLanguageKind.CppCx && reference.Resolve().Result.DeclaredElement.GetResolveEntityFromDeclaredElement() is ICppDeclaratorResolveEntity constructor && constructor.IsConstructorDeclarator() && constructor.GetClassByMember() is ICppClassResolveEntity constructorClass && constructorClass.IsCliDelegate())
++		{
++			return Array.Empty<DeclaredElementInstance>();
++		}
+ 		if ((uint)preferenceKind <= 2u)
+ 		{
+ 			if (treeNode is QualifiedReference qualifiedReference && IsType(qualifiedReference.GetResolvedReference()))
+@@ -60,7 +65,20 @@ public class CppLanguageReferenceSelector : ILanguageReferenceSelector
+ 				NewExpression byNewTypeId = NewExpressionNavigator.GetByNewTypeId(TypeIdNavigator.GetByDeclarationSpecifiers(DeclarationSpecifiersNavigator.GetByDeclarationSpecifierTypename(declarationSpecifierTypename)));
+ 				if (byNewTypeId != null)
+ 				{
+-					return GetUserDeclaredElements(psiServices, byNewTypeId.GetResolvedOperator().ConstructorResolveResult, declarationSpecifierTypename.GetCppResolveResult());
++					CppResolveResult constructorResolveResult = byNewTypeId.GetResolvedOperator().ConstructorResolveResult;
++					// @MOD CLI/CX; CX-ONLY
++					if (preferenceKind == ReferencePreferenceKind.ToDeclaration && declarationSpecifierTypename.GetFileCache().ResolveCache.TypeFactory.GetDialect().LanguageKind == CppLanguageKind.CppCx)
++					{
++						foreach (ICppResolveEntity candidate in constructorResolveResult.GetCandidates())
++						{
++							ICppClassResolveEntity classByMember = candidate.GetClassByMember();
++							if (classByMember != null && classByMember.IsCliDelegate())
++							{
++								return new global::_003C_003Ez__ReadOnlySingleElementList<DeclaredElementInstance>(new DeclaredElementInstance(new CppResolveEntityDeclaredElement(psiServices, classByMember)));
++							}
++						}
++					}
++					return GetUserDeclaredElements(psiServices, constructorResolveResult, declarationSpecifierTypename.GetCppResolveResult());
+ 				}
+ 			}
+ 		}

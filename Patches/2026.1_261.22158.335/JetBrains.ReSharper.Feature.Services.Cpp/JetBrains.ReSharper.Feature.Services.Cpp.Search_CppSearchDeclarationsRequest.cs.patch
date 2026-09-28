@@ -1,12 +1,13 @@
 diff --git a/JetBrains.ReSharper.Feature.Services.Cpp.Search/CppSearchDeclarationsRequest.cs b/JetBrains.ReSharper.Feature.Services.Cpp.Search/CppSearchDeclarationsRequest.cs
-index 042b952acf60a7ecd706aec584201459559c562d..38d19b847fc2d2a2bf2b5f3cc15a3bac1693a807 100644
+index 042b952acf60a7ecd706aec584201459559c562d..4d994f84902ebf3fba64e599700f5e3b9692c956 100644
 --- a/JetBrains.ReSharper.Feature.Services.Cpp.Search/CppSearchDeclarationsRequest.cs
 +++ b/JetBrains.ReSharper.Feature.Services.Cpp.Search/CppSearchDeclarationsRequest.cs
-@@ -66,10 +66,19 @@ public class CppSearchDeclarationsRequest : SearchDeclarationsRequest
+@@ -66,10 +66,20 @@ public class CppSearchDeclarationsRequest : SearchDeclarationsRequest
  		IPsiServices psiServices = Solution.GetPsiServices();
  		if (validDeclaredElement.IsClrElement())
  		{
 -			return new List<IOccurrence>(1)
++			// @MOD C++/CX
 +			List<IOccurrence> occurrences = new List<IOccurrence>(1)
  			{
  				new DeclaredElementOccurrence(validDeclaredElement)

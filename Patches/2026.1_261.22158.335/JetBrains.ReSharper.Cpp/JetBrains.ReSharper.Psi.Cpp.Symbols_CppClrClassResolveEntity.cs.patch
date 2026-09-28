@@ -1,5 +1,5 @@
 diff --git a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClrClassResolveEntity.cs b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClrClassResolveEntity.cs
-index ba4e6db653d21b36abbc756304ffc3175ef93199..9ac4a06b9e4676c922b25ef08ab89e962030e04c 100644
+index ba4e6db653d21b36abbc756304ffc3175ef93199..51e262ad451b2a925e852ff5e9085aa62dd199c4 100644
 --- a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClrClassResolveEntity.cs
 +++ b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppClrClassResolveEntity.cs
 @@ -134,8 +134,53 @@ public sealed class CppClrClassResolveEntity : CppType, ICppMutableClassResolveE
@@ -58,7 +58,25 @@ index ba4e6db653d21b36abbc756304ffc3175ef93199..9ac4a06b9e4676c922b25ef08ab89e96
  		{
  			return;
  		}
-@@ -758,6 +803,26 @@ public sealed class CppClrClassResolveEntity : CppType, ICppMutableClassResolveE
+@@ -332,6 +377,17 @@ public sealed class CppClrClassResolveEntity : CppType, ICppMutableClassResolveE
+ 			}
+ 			return new CppQualType(myEnumUnderlyingType);
+ 		}
++		// @MOD C++/CX: metadata enums may not implement the CLR IEnum projection.
++		if (GetKey().IsEnum())
++		{
++			CppClrTypeConverter cvt = new CppClrTypeConverter(this);
++			foreach (ITypeMember member in cvt.GetMembers(myClazz))
++			{
++				if (member is IField field && field.ShortName == "value__")
++					return cvt.ConvertMemberType(field);
++			}
++			return CppPredefinedTypes.Int;
++		}
+ 		return CppQualType.NullType();
+ 	}
+ 
+@@ -758,6 +814,34 @@ public sealed class CppClrClassResolveEntity : CppType, ICppMutableClassResolveE
  		return myChildren;
  	}
  
@@ -70,6 +88,14 @@ index ba4e6db653d21b36abbc756304ffc3175ef93199..9ac4a06b9e4676c922b25ef08ab89e96
 +		if (fullName == "Platform.Enum" || fullName == "Platform.ValueType")
 +		{
 +			return CppClassKey.REF_CLASS;
++		}
++		// ECMA-335 identifies an enum by its single non-static instance field named value__.
++		foreach (ITypeMember member in element.GetMembers())
++		{
++			if (member is IField { ShortName: "value__", IsStatic: false, IsConstant: false })
++			{
++				return CppClassKey.ENUM_CLASS;
++			}
 +		}
 +		// The CLR reader only recognizes System.ValueType; platform.winmd uses Platform.ValueType.
 +		foreach (IDeclaredType superType in element.GetSuperTypes())
@@ -85,7 +111,7 @@ index ba4e6db653d21b36abbc756304ffc3175ef93199..9ac4a06b9e4676c922b25ef08ab89e96
  	public static CppClassKey ComputeClassKey(ITypeElement element)
  	{
  		if (element is IClass)
-@@ -817,7 +882,7 @@ public sealed class CppClrClassResolveEntity : CppType, ICppMutableClassResolveE
+@@ -817,7 +901,7 @@ public sealed class CppClrClassResolveEntity : CppType, ICppMutableClassResolveE
  				AddChild(Import(this, nestedType));
  			}
  			myConversions = CppDeclaratorResolveEntityPack.Create(this, CppConversionsPackId.INSTANCE, CppLocationAnchor.GeneratedEntity());
@@ -94,7 +120,16 @@ index ba4e6db653d21b36abbc756304ffc3175ef93199..9ac4a06b9e4676c922b25ef08ab89e96
  			{
  				ICppDeclaratorResolveEntity cppDeclaratorResolveEntity = null;
  				if (member is IMethod method)
-@@ -894,7 +959,7 @@ public sealed class CppClrClassResolveEntity : CppType, ICppMutableClassResolveE
+@@ -831,7 +915,7 @@ public sealed class CppClrClassResolveEntity : CppType, ICppMutableClassResolveE
+ 				}
+ 				else if (member is IField field)
+ 				{
+-					if (!field.IsEnumMember)
++					if (!field.IsEnumMember && (!GetKey().IsEnum() || !field.IsConstant) /*@MOD C++/CX*/)
+ 					{
+ 						cppDeclaratorResolveEntity = new CppClrUngroupedVariableDeclarator(this, field, in cvt);
+ 					}
+@@ -894,7 +978,7 @@ public sealed class CppClrClassResolveEntity : CppType, ICppMutableClassResolveE
  			}
  			if (myClazz is IDelegate obj2)
  			{
@@ -103,29 +138,36 @@ index ba4e6db653d21b36abbc756304ffc3175ef93199..9ac4a06b9e4676c922b25ef08ab89e96
  				CppClrUngroupedFunctionDeclarator cppClrUngroupedFunctionDeclarator = new CppClrUngroupedFunctionDeclarator(this, obj2.InvokeMethod, CppOperatorId.PAREN_OPERATOR_NAME, in cvt2);
  				CppQualifiedNamePart innerIfTemplateId2 = cppClrUngroupedFunctionDeclarator.Name.GetInnerIfTemplateId();
  				CppLocationAnchor anchor2 = CppLocationAnchor.GeneratedEntity();
-@@ -907,6 +972,10 @@ public sealed class CppClrClassResolveEntity : CppType, ICppMutableClassResolveE
+@@ -902,11 +986,17 @@ public sealed class CppClrClassResolveEntity : CppType, ICppMutableClassResolveE
+ 			}
+ 			CppQualifiedNamePart innerIfTemplateId3 = myName.GetInnerIfTemplateId();
+ 			myConstructors = CppDeclaratorResolveEntityPack.Create(this, innerIfTemplateId3, CppLocationAnchor.GeneratedEntity());
++			Language.CppLanguageKind languageKind = cvt.TypeFactory.GetDialect().LanguageKind;
+ 			if (myClazz is IDelegate obj3)
+ 			{
++				if (languageKind != Language.CppLanguageKind.CppCx) // @MOD C++/CX
  				myConstructors.AddDeclarator(new CppCxxCliDelegateConstructorResolveEntity(this, innerIfTemplateId3, CppCxxCliDelegateConstructorResolveEntity.CtorType.GLOBAL_FUNC_CLRCALL));
  				myConstructors.AddDeclarator(new CppCxxCliDelegateConstructorResolveEntity(this, innerIfTemplateId3, CppCxxCliDelegateConstructorResolveEntity.CtorType.GLOBAL_FUNC_CDECL));
  				myConstructors.AddDeclarator(new CppCxxCliDelegateConstructorResolveEntity(this, innerIfTemplateId3, CppCxxCliDelegateConstructorResolveEntity.CtorType.GLOBAL_FUNC_STDCALL));
-+				if (cvt.TypeFactory.GetDialect().LanguageKind == Language.CppLanguageKind.CppCx) // @MOD C++/CX
++				if (languageKind == Language.CppLanguageKind.CppCx) // @MOD C++/CX
 +				{
 +					myConstructors.AddDeclarator(new CppCxxCliDelegateConstructorResolveEntity(this, innerIfTemplateId3, CppCxxCliDelegateConstructorResolveEntity.CtorType.CX_LAMBDA));
 +				}
  				if (obj3.InvokeMethod.Parameters.Count > 0)
  				{
  					myConstructors.AddDeclarator(new CppCxxCliDelegateConstructorResolveEntity(this, innerIfTemplateId3, CppCxxCliDelegateConstructorResolveEntity.CtorType.THIS_ARG_MEMBER_FUNC));
-@@ -938,6 +1007,10 @@ public sealed class CppClrClassResolveEntity : CppType, ICppMutableClassResolveE
+@@ -938,6 +1028,10 @@ public sealed class CppClrClassResolveEntity : CppType, ICppMutableClassResolveE
  					}
  				}
  			}
-+			if (cvt.TypeFactory.GetDialect().LanguageKind == Language.CppLanguageKind.CppCx && GetKey().IsCliValueClass()) // @MOD C++/CX
++			if (languageKind == Language.CppLanguageKind.CppCx && GetKey().IsCliValueClass()) // @MOD C++/CX
 +			{
 +				GenerateCppCxValueSpecialMembers(cvt.TypeFactory);
 +			}
  			if (myDestructors == null)
  			{
  				CppQualifiedNamePart destructorNameByClass = Name.GetDestructorNameByClass();
-@@ -967,6 +1040,32 @@ public sealed class CppClrClassResolveEntity : CppType, ICppMutableClassResolveE
+@@ -967,6 +1061,32 @@ public sealed class CppClrClassResolveEntity : CppType, ICppMutableClassResolveE
  		myNotMergedSymbolsState = NotMergedState.DONE;
  	}
  
@@ -158,7 +200,7 @@ index ba4e6db653d21b36abbc756304ffc3175ef93199..9ac4a06b9e4676c922b25ef08ab89e96
  	private void MergeBases(in CppClrTypeConverter cvt)
  	{
  		CppList<CppBasicBaseDescription<CppQualType>> cppList = default(CppList<CppBasicBaseDescription<CppQualType>>);
-@@ -974,14 +1073,19 @@ public sealed class CppClrClassResolveEntity : CppType, ICppMutableClassResolveE
+@@ -974,14 +1094,19 @@ public sealed class CppClrClassResolveEntity : CppType, ICppMutableClassResolveE
  		{
  			bool flag = GetKey().IsCliInterface();
  			bool flag2 = true;
@@ -181,7 +223,7 @@ index ba4e6db653d21b36abbc756304ffc3175ef93199..9ac4a06b9e4676c922b25ef08ab89e96
  				if (cppClassResolveEntity == null)
  				{
  					continue;
-@@ -992,9 +1096,9 @@ public sealed class CppClrClassResolveEntity : CppType, ICppMutableClassResolveE
+@@ -992,9 +1117,9 @@ public sealed class CppClrClassResolveEntity : CppType, ICppMutableClassResolveE
  				{
  					specifiers = CppBaseSpecifiers.VIRTUAL | CppBaseSpecifiers.IMPLICIT;
  				}
@@ -193,7 +235,7 @@ index ba4e6db653d21b36abbc756304ffc3175ef93199..9ac4a06b9e4676c922b25ef08ab89e96
  					cppList.Add(new CppBasicBaseDescription<CppQualType>(specifiers, cppQualType));
  					ICppClassResolveEntity resolvedClassTypeEntity = cppQualType.GetResolvedClassTypeEntity();
  					if (resolvedClassTypeEntity != null)
-@@ -1017,7 +1121,8 @@ public sealed class CppClrClassResolveEntity : CppType, ICppMutableClassResolveE
+@@ -1017,7 +1142,8 @@ public sealed class CppClrClassResolveEntity : CppType, ICppMutableClassResolveE
  			if (flag2)
  			{
  				CppGlobalNamespaceResolveEntity.CppBuiltinsRefs builtinsRefs = cvt.GlobalNamespace.GetBuiltinsRefs();
@@ -203,7 +245,7 @@ index ba4e6db653d21b36abbc756304ffc3175ef93199..9ac4a06b9e4676c922b25ef08ab89e96
  				if (cppClassResolveEntity2 != null && cppClassResolveEntity2 != this)
  				{
  					CppBaseSpecifiers cppBaseSpecifiers = CppBaseSpecifiers.PUBLIC | CppBaseSpecifiers.IMPLICIT;
-@@ -1032,7 +1137,7 @@ public sealed class CppClrClassResolveEntity : CppType, ICppMutableClassResolveE
+@@ -1032,7 +1158,7 @@ public sealed class CppClrClassResolveEntity : CppType, ICppMutableClassResolveE
  		}
  		else if (GetKey().IsEnum())
  		{

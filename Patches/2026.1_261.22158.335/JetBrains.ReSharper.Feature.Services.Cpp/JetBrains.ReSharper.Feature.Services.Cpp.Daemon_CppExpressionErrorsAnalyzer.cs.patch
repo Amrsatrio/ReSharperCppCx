@@ -1,5 +1,5 @@
 diff --git a/JetBrains.ReSharper.Feature.Services.Cpp.Daemon/CppExpressionErrorsAnalyzer.cs b/JetBrains.ReSharper.Feature.Services.Cpp.Daemon/CppExpressionErrorsAnalyzer.cs
-index 22b3e8ea65bf3861ce2d82d5bb3a9e44d0f2c932..c6bed2299a6355b04c3f2f0ee91f84afde55c2ee 100644
+index 22b3e8ea65bf3861ce2d82d5bb3a9e44d0f2c932..49dddc65005693120479bcd11833b6943c9ffe66 100644
 --- a/JetBrains.ReSharper.Feature.Services.Cpp.Daemon/CppExpressionErrorsAnalyzer.cs
 +++ b/JetBrains.ReSharper.Feature.Services.Cpp.Daemon/CppExpressionErrorsAnalyzer.cs
 @@ -567,9 +567,17 @@ public class CppExpressionErrorsAnalyzer : IElementProblemAnalyzer
@@ -42,3 +42,12 @@ index 22b3e8ea65bf3861ce2d82d5bb3a9e44d0f2c932..c6bed2299a6355b04c3f2f0ee91f84af
  		object obj = GetErrorNode(conv, cast);
  		if (obj == null)
  		{
+@@ -1509,7 +1519,7 @@ public class CppExpressionErrorsAnalyzer : IElementProblemAnalyzer
+ 		CppImplicitConversionSequence cppImplicitConversionSequence = new CppConversionHelper(in typeContext, CppConversionParameters.DefaultParams).FromCopyInitialization(new CppExpressionInfo(expr, typeAndCategory), convertedT);
+ 		if (!(cppImplicitConversionSequence is CppUserDefinedConversionSequence cppUserDefinedConversionSequence))
+ 		{
+-			if (cppImplicitConversionSequence is CppStandardConversionSequence { First: { Kind: CppImplicitConversionKind.CliStringLiteralConversion }, First: var first2 })
++			if (cppImplicitConversionSequence is CppStandardConversionSequence { First: { Kind: CppImplicitConversionKind.CliStringLiteralConversion or CppImplicitConversionKind.CliBoxingConversion /*@MOD C++/CX*/ }, First: var first2 })
+ 			{
+ 				return CppTypeAndCategory.MakePRValue(first2.TargetType);
+ 			}

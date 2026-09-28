@@ -1,0 +1,22 @@
+diff --git a/JetBrains.ReSharper.Feature.Services.Cpp.CodeCompletion/CppCompletionTreeUtil.cs b/JetBrains.ReSharper.Feature.Services.Cpp.CodeCompletion/CppCompletionTreeUtil.cs
+index 1b59b535ea7667e711be7694f84280e5a1d8dc85..afb8f68cf36a99b041d495cd1faad85222352622 100644
+--- a/JetBrains.ReSharper.Feature.Services.Cpp.CodeCompletion/CppCompletionTreeUtil.cs
++++ b/JetBrains.ReSharper.Feature.Services.Cpp.CodeCompletion/CppCompletionTreeUtil.cs
+@@ -907,7 +907,7 @@ public static class CppCompletionTreeUtil
+ 					{
+ 						continue;
+ 					}
+-					cppScopeLikeResolveEntity = CppGlobalNamespaceResolveEntity.GetInstance(cppClassResolveEntity).GetBuiltinsRefs().cli_system_enum;
++					cppScopeLikeResolveEntity = CppGlobalNamespaceResolveEntity.GetInstance(cppClassResolveEntity).GetBuiltinsRefs().GetManagedEnum(typeContext.Factory.GetDialect().LanguageKind); // @MOD C++/CX
+ 				}
+ 			}
+ 			else if (cppScopeLikeResolveEntity is CppDependencyKillerResolveEntity cppDependencyKillerResolveEntity)
+@@ -959,7 +959,7 @@ public static class CppCompletionTreeUtil
+ 						{
+ 							goto IL_00f0;
+ 						}
+-						cppScopeLikeResolveEntity = CppGlobalNamespaceResolveEntity.GetInstance(cppClassResolveEntity).GetBuiltinsRefs().cli_system_enum;
++						cppScopeLikeResolveEntity = CppGlobalNamespaceResolveEntity.GetInstance(cppClassResolveEntity).GetBuiltinsRefs().GetManagedEnum(tc.Factory.GetDialect().LanguageKind); // @MOD C++/CX
+ 					}
+ 					goto IL_009f;
+ 				}

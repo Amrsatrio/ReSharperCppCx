@@ -1,8 +1,16 @@
 diff --git a/JetBrains.ReSharper.Psi.Cpp.Types/CppTypesUtil.cs b/JetBrains.ReSharper.Psi.Cpp.Types/CppTypesUtil.cs
-index 52a52bb881630ed4242007aa85aaf68521a1596b..d3fdf8f1b6793e096bb093099dbd0a389b184286 100644
+index 52a52bb881630ed4242007aa85aaf68521a1596b..0d065fe9c06846015f2cffe2786d88616b481a1a 100644
 --- a/JetBrains.ReSharper.Psi.Cpp.Types/CppTypesUtil.cs
 +++ b/JetBrains.ReSharper.Psi.Cpp.Types/CppTypesUtil.cs
-@@ -937,7 +937,7 @@ public static class CppTypesUtil
+@@ -934,10 +934,15 @@ public static class CppTypesUtil
+ 		default:
+ 			lhsT = lhsT.DoNormalConversions(typeFactory);
+ 			rhsT = rhsT.DoNormalConversions(typeFactory);
++			// @MOD C++/CX
++			if (opKind == CppOperatorKind.PLUS && dialect.LanguageKind == CppLanguageKind.CppCx && lhsT.Type.IsCliEnum() && rhsT.Type.IsCliEnum() && AreEqualUnqualifiedTypes(lhsT.Type, rhsT.Type))
++			{
++				return CppTypeAndCategory.MakePRValue(lhsT.Type);
++			}
  			if (((uint)(opKind - 2) <= 5u || (uint)(opKind - 14) <= 1u) ? true : false)
  			{
  				bool flag2 = (uint)(opKind - 5) <= 2u;
@@ -11,7 +19,7 @@ index 52a52bb881630ed4242007aa85aaf68521a1596b..d3fdf8f1b6793e096bb093099dbd0a38
  				{
  					bool flag4 = lhsT.Type.IsCliEnum();
  					bool flag5 = rhsT.Type.IsCliEnum();
-@@ -2023,7 +2023,42 @@ public static class CppTypesUtil
+@@ -2023,7 +2028,42 @@ public static class CppTypesUtil
  
  	public static bool IsCliArray(this CppQualType t)
  	{
@@ -55,7 +63,7 @@ index 52a52bb881630ed4242007aa85aaf68521a1596b..d3fdf8f1b6793e096bb093099dbd0a38
  	}
  
  	public static bool IsPointer(this CppQualType t)
-@@ -2729,7 +2764,7 @@ public static class CppTypesUtil
+@@ -2729,7 +2769,7 @@ public static class CppTypesUtil
  
  	public static ICppExpression GetCliArrayRankExpression(this CppQualType t)
  	{
@@ -64,7 +72,7 @@ index 52a52bb881630ed4242007aa85aaf68521a1596b..d3fdf8f1b6793e096bb093099dbd0a38
  	}
  
  	public static int? GetCliArrayRank(this CppQualType t, in CppTypeContext tc)
-@@ -2737,7 +2772,7 @@ public static class CppTypesUtil
+@@ -2737,7 +2777,7 @@ public static class CppTypesUtil
  		CppCliArrayType cppCliArrayType = t.InternalAs<CppCliArrayType>();
  		if (cppCliArrayType == null)
  		{
@@ -73,7 +81,7 @@ index 52a52bb881630ed4242007aa85aaf68521a1596b..d3fdf8f1b6793e096bb093099dbd0a38
  		}
  		ICppValueExpression valueIfValueExpression = CppExpressionsUtil.GetValueIfValueExpression(cppCliArrayType.RankExpression);
  		if (valueIfValueExpression == null)
-@@ -3133,7 +3168,7 @@ public static class CppTypesUtil
+@@ -3133,7 +3173,7 @@ public static class CppTypesUtil
  		CppNumericType cppNumericType = t.InternalAs<CppNumericType>();
  		if (cppNumericType != null)
  		{
@@ -82,7 +90,7 @@ index 52a52bb881630ed4242007aa85aaf68521a1596b..d3fdf8f1b6793e096bb093099dbd0a38
  		}
  		if (!t.IsCliValueClassType())
  		{
-@@ -3146,9 +3181,13 @@ public static class CppTypesUtil
+@@ -3146,9 +3186,13 @@ public static class CppTypesUtil
  	public static CppCliHandleType GetCliObjectHandleType(this ICppResolvedTypeFactory tf)
  	{
  		CppGlobalNamespaceResolveEntity.CppBuiltinsRefs builtinsRefs = tf.ResolveCache.GlobalNamespace.GetBuiltinsRefs();
@@ -98,7 +106,7 @@ index 52a52bb881630ed4242007aa85aaf68521a1596b..d3fdf8f1b6793e096bb093099dbd0a38
  		}
  		return null;
  	}
-@@ -3159,10 +3198,10 @@ public static class CppTypesUtil
+@@ -3159,10 +3203,10 @@ public static class CppTypesUtil
  		CppGlobalNamespaceResolveEntity.CppBuiltinsRefs builtinsRefs = tf.ResolveCache.GlobalNamespace.GetBuiltinsRefs();
  		if (builtinsRefs != null)
  		{
@@ -112,7 +120,7 @@ index 52a52bb881630ed4242007aa85aaf68521a1596b..d3fdf8f1b6793e096bb093099dbd0a38
  			}
  		}
  		return null;
-@@ -3218,7 +3257,7 @@ public static class CppTypesUtil
+@@ -3218,7 +3262,7 @@ public static class CppTypesUtil
  
  	public static CppQualType GetCliArrayInnerType(this CppQualType t)
  	{
@@ -121,7 +129,7 @@ index 52a52bb881630ed4242007aa85aaf68521a1596b..d3fdf8f1b6793e096bb093099dbd0a38
  	}
  
  	public static CppQualType GetCliArrayInnerType(this CppCliArrayType t, Qualifiers q)
-@@ -3802,7 +3841,7 @@ public static class CppTypesUtil
+@@ -3802,7 +3846,7 @@ public static class CppTypesUtil
  		CppNumericType cppNumericType = t.InternalAs<CppNumericType>();
  		if (cppNumericType != null)
  		{
@@ -130,7 +138,7 @@ index 52a52bb881630ed4242007aa85aaf68521a1596b..d3fdf8f1b6793e096bb093099dbd0a38
  			if (cli_system_numtypes != null && cli_system_numtypes.TryGetValue(cppNumericType.Kind, out var value))
  			{
  				return value;
-@@ -5163,6 +5202,11 @@ public static class CppTypesUtil
+@@ -5163,6 +5207,11 @@ public static class CppTypesUtil
  	public static CppTypeAndCategory DoNormalConversions(this CppTypeAndCategory t, ICppResolvedTypeFactory typeFactory)
  	{
  		t = t.DoLvalToRValConv();
@@ -142,7 +150,7 @@ index 52a52bb881630ed4242007aa85aaf68521a1596b..d3fdf8f1b6793e096bb093099dbd0a38
  		if (!typeFactory.GetDialect().IsHLSL())
  		{
  			t = t.DoArrayToPtrConv(typeFactory);
-@@ -5643,7 +5687,8 @@ public static class CppTypesUtil
+@@ -5643,7 +5692,8 @@ public static class CppTypesUtil
  
  	public static CppCliHandleConversionKind ClassifyCliHandleConversion(CppQualType from, CppQualType to, in CppTypeContext tc, bool allowObject)
  	{
@@ -152,7 +160,7 @@ index 52a52bb881630ed4242007aa85aaf68521a1596b..d3fdf8f1b6793e096bb093099dbd0a38
  		{
  			return CppCliHandleConversionKind.No;
  		}
-@@ -5681,7 +5726,13 @@ public static class CppTypesUtil
+@@ -5681,7 +5731,13 @@ public static class CppTypesUtil
  							}
  							return CppCliHandleConversionKind.No;
  						}
