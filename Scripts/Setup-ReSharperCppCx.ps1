@@ -9,7 +9,8 @@ Both modes cache pristine targets, XML documentation, and direct assembly-refere
 DLLs under the version's
 Work\...\References directory. Generated projects target .NET Framework 4.8,
 receive relative HintPath entries into that cache, mark assembly references
-non-private, and public-sign with the original JetBrains strong-name public key.
+non-private, public-sign with the original JetBrains strong-name public key,
+and enable deterministic CI builds so IDE and scripted builds produce the same bytes.
 Feature Services references the generated ReSharper.Cpp project. No patches are
 applied and no project is built.
 
@@ -621,12 +622,14 @@ function Set-ProjectBuildConfiguration {
     $targetFrameworks[0].InnerText = 'net48'
     if ($PublicKey.Length -eq 0) { throw "Assembly public key is empty: $Path" }
     $propertyGroup = $targetFrameworks[0].ParentNode
-    $signingProperties = [ordered]@{
+    $projectProperties = [ordered]@{
         SignAssembly = 'true'
         PublicSign = 'true'
         AssemblyOriginatorKeyFile = 'JetBrains.ReSharper.PublicKey.snk'
+        Deterministic = 'true'
+        ContinuousIntegrationBuild = 'true'
     }
-    foreach ($entry in $signingProperties.GetEnumerator()) {
+    foreach ($entry in $projectProperties.GetEnumerator()) {
         $propertyNodes = @($document.SelectNodes(
             "/*[local-name()='Project']/*[local-name()='PropertyGroup']/*[local-name()='$($entry.Key)']"))
         if ($propertyNodes.Count -gt 1) { throw "Project contains multiple $($entry.Key) values: $Path" }
