@@ -180,13 +180,16 @@ if ($Action -ceq 'Install') {
         $backup = [IO.Path]::GetFullPath([string]$target.backup)
         $currentHash = Get-Sha256 $destination
         $mode = 'fresh'
+        $preserveCurrent = $false
         if ($null -ne $record) {
             if (-not (Test-Path -LiteralPath $backup -PathType Leaf)) { throw "Original backup is missing: $backup" }
             Assert-TargetAssembly -Path $backup -ExpectedName ([IO.Path]::GetFileNameWithoutExtension($fileName)) `
                 -ExpectedIdentity $target.assemblyIdentity -ExpectedVersion $riderInfo.Version -RequireJetBrainsSignature
             if ((Get-Sha256 $backup) -cne $target.originalSha256) { throw "Original backup hash mismatch: $backup" }
             if ($currentHash -cne $target.installedSha256 -and $currentHash -cne $artifact.Metadata.builtSha256) {
-                throw "Installed DLL has an unknown hash: $destination"
+                Assert-TargetAssembly -Path $destination -ExpectedName ([IO.Path]::GetFileNameWithoutExtension($fileName)) `
+                    -ExpectedIdentity $target.assemblyIdentity -ExpectedVersion $riderInfo.Version
+                $preserveCurrent = $true
             }
             $mode = if ($currentHash -ceq $artifact.Metadata.builtSha256) { 'noop' } else { 'update' }
         }
@@ -207,6 +210,8 @@ if ($Action -ceq 'Install') {
             Artifact = $artifact
             OriginalHash = [string]$target.originalSha256
             InstalledHash = [string]$artifact.Metadata.builtSha256
+            CurrentHash = $currentHash
+            PreserveCurrent = $preserveCurrent
             Identity = [string]$target.assemblyIdentity
             BackupCreated = $false
             Replaced = $false
@@ -254,8 +259,9 @@ else {
         Assert-TargetAssembly -Path $destination -ExpectedName $name -ExpectedIdentity $target.assemblyIdentity `
             -ExpectedVersion $riderInfo.Version
         $currentHash = Get-Sha256 $destination
+        $preserveCurrent = $false
         if ($currentHash -cne $target.installedSha256 -and $currentHash -cne $target.originalSha256) {
-            throw "Installed DLL has an unknown hash: $destination"
+            $preserveCurrent = $true
         }
         $id = [Guid]::NewGuid().ToString('N')
         $base = [IO.Path]::GetFileNameWithoutExtension($destination)
@@ -267,6 +273,8 @@ else {
             Mode = $(if ($currentHash -ceq $target.originalSha256) { 'noop' } else { 'restore' })
             OriginalHash = [string]$target.originalSha256
             InstalledHash = [string]$target.installedSha256
+            CurrentHash = $currentHash
+            PreserveCurrent = $preserveCurrent
             Identity = [string]$target.assemblyIdentity
             BackupCreated = $false
             Replaced = $false
@@ -281,7 +289,40 @@ if (-not $PSCmdlet.ShouldProcess(($entries.Path -join ', '), $description)) {
 }
 
 $committed = $false
+$recoveryDirectory = $null
 try {
+    $preservedEntries = @($entries | Where-Object { $_.PreserveCurrent })
+    if ($preservedEntries.Count -gt 0) {
+        $recoveryDirectory = Join-Path ([IO.Path]::GetDirectoryName($recordPath)) `
+            (Join-Path 'Recovery' ([DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss') + '-' + [Guid]::NewGuid().ToString('N')))
+        [IO.Directory]::CreateDirectory($recoveryDirectory) | Out-Null
+        [IO.File]::Copy($recordPath, (Join-Path $recoveryDirectory 'install.json'), $false)
+        $recoveryTargets = @()
+        for ($index = 0; $index -lt $preservedEntries.Count; ++$index) {
+            $entry = $preservedEntries[$index]
+            $recoveryFile = '{0:D3}-{1}' -f $index, [IO.Path]::GetFileName($entry.Path)
+            $recoveryPath = Join-Path $recoveryDirectory $recoveryFile
+            [IO.File]::Copy($entry.Path, $recoveryPath, $false)
+            if ((Get-Sha256 $recoveryPath) -cne $entry.CurrentHash) {
+                throw "Recovery copy hash mismatch: $recoveryPath"
+            }
+            $recoveryTargets += [ordered]@{
+                source = $entry.Path
+                sha256 = $entry.CurrentHash
+                recoveryFile = $recoveryFile
+            }
+        }
+        Write-AtomicPatchJson -Path (Join-Path $recoveryDirectory 'recovery.json') -Value ([ordered]@{
+            schemaVersion = 1
+            riderDirectory = $rider
+            version = $riderInfo.Version
+            build = $riderInfo.Build
+            createdUtc = [DateTime]::UtcNow.ToString('o')
+            reason = 'unrecordedInstalledAssemblies'
+            targets = $recoveryTargets
+        })
+        Write-Warning "Installed assemblies differ from the installation record. Preserved them in: $recoveryDirectory"
+    }
     foreach ($entry in $entries) {
         if ($entry.Mode -eq 'noop') { continue }
         $inputPath = if ($Action -ceq 'Install') { $entry.Artifact.Path } else { $entry.Backup }
@@ -377,4 +418,7 @@ if ($Action -ceq 'Restore') {
 }
 
 Write-Host "$description completed."
+if (-not [string]::IsNullOrWhiteSpace($recoveryDirectory)) {
+    Write-Host "Previous unrecorded assemblies: $recoveryDirectory"
+}
 foreach ($entry in $entries) { Write-Host "$($entry.Path) SHA256: $(Get-Sha256 $entry.Path)" }

@@ -255,7 +255,7 @@ The installer:
 1. Clones the pinned ILSpy source when needed, applies the repository's decompiler compatibility patch, builds `ilspycmd`, and decompiles the DLLs into an isolated workspace under `Work`.
 1. Applies the C++/CX source patches and builds both modified DLLs with .NET SDK 10 or newer.
 1. Validates the resulting assembly identities, Rider version metadata, source fingerprints, and build manifest.
-1. Installs the two modified DLLs and their matching R2R images as one transaction, retaining the signed originals as `.bak.dll` files and rolling back failures.
+1. Installs the two modified DLLs and their matching R2R images as one transaction, retaining the signed originals as `.bak.dll` files and rolling back failures. If DLLs were copied in manually after a recorded install, the installer validates their Rider identity, preserves them with a hash manifest under `%LOCALAPPDATA%\ReSharperCppCx\Installations\<installation>\Recovery`, and then replaces them.
 1. Records the installation outside Rider so a later update can replace the modded DLLs while retaining the same originals, and **Restore original DLLs** can uninstall the mod safely.
 
 Generated workspaces, downloaded dependencies, and build products are not checked into the repository.

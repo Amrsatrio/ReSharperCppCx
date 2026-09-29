@@ -299,16 +299,29 @@ function Invoke-WorkflowDeployment {
     if ($NonInteractive -and -not $AllowUacPrompt) {
         throw 'Deployment requires elevation. Run from an elevated host or specify -AllowUacPrompt.'
     }
-    $command = "& $(ConvertTo-SingleQuotedLiteral $deploymentScript) -Action $(ConvertTo-SingleQuotedLiteral $RequestedAction) " +
-        "-RiderDirectory $(ConvertTo-SingleQuotedLiteral $Rider.RiderDirectory) -Configuration $(ConvertTo-SingleQuotedLiteral $Configuration)"
+    $logPath = Join-Path ([IO.Path]::GetTempPath()) ('ReSharperCppCx-deployment-' + [Guid]::NewGuid().ToString('N') + '.log')
+    $command = "`$ErrorActionPreference = 'Stop'; try { & $(ConvertTo-SingleQuotedLiteral $deploymentScript) " +
+        "-Action $(ConvertTo-SingleQuotedLiteral $RequestedAction) -RiderDirectory $(ConvertTo-SingleQuotedLiteral $Rider.RiderDirectory) " +
+        "-Configuration $(ConvertTo-SingleQuotedLiteral $Configuration)"
     if (-not [string]::IsNullOrWhiteSpace($Workspace)) {
         $command += " -WorkspaceDirectory $(ConvertTo-SingleQuotedLiteral $Workspace)"
     }
-    $command += '; if (-not $?) { exit 1 }'
+    $command += " *>&1 | Out-File -LiteralPath $(ConvertTo-SingleQuotedLiteral $logPath) -Encoding utf8; " +
+        "if (-not `$?) { exit 1 } } catch { (`$_ | Format-List * -Force | Out-String) | " +
+        "Add-Content -LiteralPath $(ConvertTo-SingleQuotedLiteral $logPath) -Encoding utf8; exit 1 }"
     $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($command))
-    $process = Start-Process -FilePath (Join-Path $PSHOME 'powershell.exe') -Verb RunAs -Wait -PassThru `
-        -ArgumentList "-NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand $encoded"
-    if ($process.ExitCode -ne 0) { throw "Elevated deployment failed with exit code $($process.ExitCode)." }
+    try {
+        $process = Start-Process -FilePath (Join-Path $PSHOME 'powershell.exe') -Verb RunAs -Wait -PassThru `
+            -ArgumentList "-NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand $encoded"
+        if (Test-Path -LiteralPath $logPath -PathType Leaf) {
+            $deploymentOutput = [IO.File]::ReadAllText($logPath)
+            if (-not [string]::IsNullOrWhiteSpace($deploymentOutput)) { Write-Host $deploymentOutput.TrimEnd() }
+        }
+        if ($process.ExitCode -ne 0) { throw "Elevated deployment failed with exit code $($process.ExitCode)." }
+    }
+    finally {
+        if (Test-Path -LiteralPath $logPath -PathType Leaf) { [IO.File]::Delete($logPath) }
+    }
 }
 
 function New-InstalledSource {
