@@ -147,15 +147,17 @@ function Get-WorkspaceRequest {
 function Assert-ReusableWorkspace {
     param(
         [Parameter(Mandatory)][string]$Workspace,
-        [Parameter(Mandatory)]$Request
+        [Parameter(Mandatory)]$Request,
+        [switch]$ApprovePatchRefresh
     )
     $state = Read-RiderWorkspaceState -WorkspaceDirectory $Workspace
     $expectedPatchSet = if ($null -eq $Request.Resolution) { $null } else { $Request.Resolution.PatchSet.Name }
     $expectedPatchHash = if ($null -eq $Request.Resolution) { $null } else { $Request.Resolution.PatchSet.Sha256 }
-    if ($state.version -cne $Request.Source.Version -or $state.build -cne $Request.Source.Build -or
-        $state.patchMode -cne $Request.PatchMode -or [string]$state.patchSet -cne [string]$expectedPatchSet -or
-        [string]$state.patchSetSha256 -cne [string]$expectedPatchHash) {
-        throw "Existing workspace belongs to another source or patch selection: $Workspace. Use -ResetWorkspace."
+    $disposition = Get-RiderWorkspaceDisposition -State $state -ExpectedVersion $Request.Source.Version `
+        -ExpectedBuild $Request.Source.Build -ExpectedPatchMode $Request.PatchMode `
+        -ExpectedPatchSet $expectedPatchSet -ExpectedPatchSetSha256 $expectedPatchHash
+    if ($disposition -ceq 'Incompatible') {
+        throw "Existing workspace belongs to another source or patch mode: $Workspace. Use -ResetWorkspace."
     }
     if ($state.patchStatus -ceq 'failed') {
         throw "Patch application previously failed; retained workspace: $Workspace`n$($state.patchError)"
@@ -172,12 +174,33 @@ function Assert-ReusableWorkspace {
             throw "Workspace original changed: $($expected.fileName)"
         }
     }
+    if ($disposition -ceq 'PatchRefreshRequired') {
+        Assert-RiderWorkspaceRefreshSafe -WorkspaceDirectory $Workspace -State $state
+        if (-not $NonInteractive -and -not $ApprovePatchRefresh) {
+            Write-Host ''
+            Write-Host "The selected patch set changed from $($state.patchSet) to $expectedPatchSet."
+            Write-Host 'Refreshing resets both generated source repositories. Local changes were checked and none were found.'
+            if ((Read-Host 'Refresh the generated workspace? [y/N]') -notmatch '^(?i:y|yes)$') {
+                throw 'Workspace refresh cancelled.'
+            }
+        }
+        & (Join-Path $scripts 'Reapply-ReSharperCppCxPatches.ps1') -WorkspaceDirectory $Workspace `
+            -PatchSetName $expectedPatchSet -Confirm:$false
+        $state = Read-RiderWorkspaceState -WorkspaceDirectory $Workspace
+        $disposition = Get-RiderWorkspaceDisposition -State $state -ExpectedVersion $Request.Source.Version `
+            -ExpectedBuild $Request.Source.Build -ExpectedPatchMode $Request.PatchMode `
+            -ExpectedPatchSet $expectedPatchSet -ExpectedPatchSetSha256 $expectedPatchHash
+        if ($disposition -cne 'Reusable' -or $state.patchStatus -cne 'applied') {
+            throw "Refreshed workspace does not match the selected patch set: $Workspace"
+        }
+        return $state
+    }
     $null = Assert-RiderWorkspaceSourceTrees -WorkspaceDirectory $Workspace -State $state
     return $state
 }
 
 function Initialize-WorkflowWorkspace {
-    param([Parameter(Mandatory)]$Request)
+    param([Parameter(Mandatory)]$Request, [switch]$ApprovePatchRefresh)
     $workspace = Get-RiderWorkspaceDirectory -WorkRoot $WorkRoot -Version $Request.Source.Version -Build $Request.Source.Build
     if ($ResetWorkspace -and (Test-Path -LiteralPath $workspace)) {
         if (-not $PSCmdlet.ShouldProcess($workspace, 'Delete and recreate the entire generated workspace')) {
@@ -187,7 +210,7 @@ function Initialize-WorkflowWorkspace {
     }
     if (Test-Path -LiteralPath $workspace -PathType Container) {
         Write-RiderWorkspaceRunConfigurations -WorkspaceDirectory $workspace
-        $state = Assert-ReusableWorkspace -Workspace $workspace -Request $Request
+        $state = Assert-ReusableWorkspace -Workspace $workspace -Request $Request -ApprovePatchRefresh:$ApprovePatchRefresh
         return [pscustomobject]@{ Directory = $workspace; State = $state }
     }
     $null = [IO.Directory]::CreateDirectory($WorkRoot)
@@ -354,7 +377,8 @@ function Get-InteractiveRequest {
         $rider = $installations[$number - 1]
     }
     Write-Host ''
-    Write-Host '  [I] Install C++/CX support'
+    if ($rider.InstallStatus -ceq 'Patched') { Write-Host '  [I] Update C++/CX support' }
+    else { Write-Host '  [I] Install C++/CX support' }
     if ($rider.InstallStatus -in @('Patched', 'Recovery required')) { Write-Host '  [R] Restore original DLLs' }
     Write-Host '  [B] Back'
     $operation = Read-Host 'Choice'
@@ -406,18 +430,38 @@ if ($Action -ceq 'Restore') {
 }
 
 $request = Get-WorkspaceRequest -Source $selectedSource -SelectedPatchMode $PatchMode -SelectedPatchSet $PatchSet
+$approvePatchRefresh = $false
 if ($Action -eq 'Install' -and -not $NonInteractive) {
+    $workspace = Get-RiderWorkspaceDirectory -WorkRoot $WorkRoot -Version $request.Source.Version -Build $request.Source.Build
+    $workspaceDisposition = 'Missing'
+    if (Test-Path -LiteralPath $workspace -PathType Container) {
+        $workspaceState = Read-RiderWorkspaceState -WorkspaceDirectory $workspace
+        $workspaceDisposition = Get-RiderWorkspaceDisposition -State $workspaceState `
+            -ExpectedVersion $request.Source.Version -ExpectedBuild $request.Source.Build `
+            -ExpectedPatchMode $request.PatchMode -ExpectedPatchSet $request.Resolution.PatchSet.Name `
+            -ExpectedPatchSetSha256 $request.Resolution.PatchSet.Sha256
+    }
+    $installVerb = if ($selectedRider.InstallStatus -ceq 'Patched') { 'update' } else { 'install' }
     Write-Host ''
     Write-Host "Rider: $($selectedRider.RiderDirectory)"
     Write-Host "Version: $($selectedSource.Version) ($($selectedSource.Build))"
     Write-Host "Patch set: $($request.Resolution.PatchSet.Name)"
     Write-Host "Work root: $WorkRoot"
-    if ((Read-Host 'Prepare, build, and install? [y/N]') -notmatch '^(?i:y|yes)$') {
+    if ($workspaceDisposition -ceq 'PatchRefreshRequired') {
+        Write-Host 'Workspace: the selected patch set changed; generated sources will be refreshed.' -ForegroundColor Yellow
+    }
+    $prompt = if ($workspaceDisposition -ceq 'PatchRefreshRequired') {
+        "Refresh, build, and $installVerb C++/CX support? [y/N]"
+    } else {
+        "Prepare, build, and $installVerb C++/CX support? [y/N]"
+    }
+    if ((Read-Host $prompt) -notmatch '^(?i:y|yes)$') {
         Write-Host 'Cancelled.'
         return
     }
+    $approvePatchRefresh = $true
 }
-$prepared = Initialize-WorkflowWorkspace -Request $request
+$prepared = Initialize-WorkflowWorkspace -Request $request -ApprovePatchRefresh:$approvePatchRefresh
 Write-Host "Workspace ready: $($prepared.Directory)"
 if ($Action -ceq 'Prepare') { return }
 

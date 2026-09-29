@@ -1037,3 +1037,45 @@ function Assert-RiderWorkspaceSourceTrees {
     return $actual
 }
 
+function Get-RiderWorkspaceDisposition {
+    param(
+        [Parameter(Mandatory)]$State,
+        [Parameter(Mandatory)][string]$ExpectedVersion,
+        [Parameter(Mandatory)][string]$ExpectedBuild,
+        [Parameter(Mandatory)][string]$ExpectedPatchMode,
+        [AllowNull()][string]$ExpectedPatchSet,
+        [AllowNull()][string]$ExpectedPatchSetSha256
+    )
+    if ($State.version -cne $ExpectedVersion -or $State.build -cne $ExpectedBuild -or
+        $State.patchMode -cne $ExpectedPatchMode) {
+        return 'Incompatible'
+    }
+    if ([string]$State.patchSet -ceq [string]$ExpectedPatchSet -and
+        [string]$State.patchSetSha256 -ceq [string]$ExpectedPatchSetSha256) {
+        return 'Reusable'
+    }
+    if ($ExpectedPatchMode -ceq 'All' -and
+        -not [string]::IsNullOrWhiteSpace($ExpectedPatchSet) -and
+        $ExpectedPatchSetSha256 -match '^[0-9a-f]{64}$') {
+        return 'PatchRefreshRequired'
+    }
+    return 'Incompatible'
+}
+
+function Assert-RiderWorkspaceRefreshSafe {
+    param([Parameter(Mandatory)][string]$WorkspaceDirectory, [Parameter(Mandatory)]$State)
+    $null = Assert-RiderWorkspaceSourceTrees -WorkspaceDirectory $WorkspaceDirectory -State $State
+    foreach ($project in @('JetBrains.ReSharper.Cpp', 'JetBrains.ReSharper.Feature.Services.Cpp')) {
+        $source = Join-Path (Join-Path ([IO.Path]::GetFullPath($WorkspaceDirectory)) $project) 'Source'
+        $unstaged = Invoke-PatchNative -FilePath git -Arguments @(
+            'diff', '--name-only', '-z', '--no-renames', '--', '.'
+        ) -WorkingDirectory $source -Quiet
+        $untracked = Invoke-PatchNative -FilePath git -Arguments @(
+            'ls-files', '--others', '--exclude-standard', '-z', '--', '.'
+        ) -WorkingDirectory $source -Quiet
+        if ($unstaged.StdOut.Length -ne 0 -or $untracked.StdOut.Length -ne 0) {
+            throw "Generated workspace contains local changes and was not refreshed: $project"
+        }
+    }
+}
+
