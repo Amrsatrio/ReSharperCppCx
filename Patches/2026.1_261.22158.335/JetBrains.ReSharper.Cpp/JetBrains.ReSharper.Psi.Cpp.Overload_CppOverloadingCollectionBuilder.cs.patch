@@ -1,5 +1,5 @@
 diff --git a/JetBrains.ReSharper.Psi.Cpp.Overload/CppOverloadingCollectionBuilder.cs b/JetBrains.ReSharper.Psi.Cpp.Overload/CppOverloadingCollectionBuilder.cs
-index 4c7a870f45619042640b3407a0771a5885d5222d..65d1eb409cf7faf23aefceba03fdafb71dbd5881 100644
+index 4c7a870f45619042640b3407a0771a5885d5222d..042321e582e42f62e704844132381f3223838673 100644
 --- a/JetBrains.ReSharper.Psi.Cpp.Overload/CppOverloadingCollectionBuilder.cs
 +++ b/JetBrains.ReSharper.Psi.Cpp.Overload/CppOverloadingCollectionBuilder.cs
 @@ -163,7 +163,7 @@ public struct CppOverloadingCollectionBuilder(CppTypeContext tc, ICppTemplateArg
@@ -7,7 +7,7 @@ index 4c7a870f45619042640b3407a0771a5885d5222d..65d1eb409cf7faf23aefceba03fdafb7
  				cppBuiltinCandidateTypeSet.myHasGcLValueType = true;
  			}
 -			if (factory.GetDialect().LanguageKind == CppLanguageKind.CppCli && CppExpressionsUtil.IsStringLiteralExpr(expr))
-+			if (factory.GetDialect().LanguageKind is CppLanguageKind.CppCli or CppLanguageKind.CppCx /*@MOD C++/CX*/ && CppExpressionsUtil.IsStringLiteralExpr(expr))
++			if (factory.GetDialect().LanguageKind == CppLanguageKind.CppCli && CppExpressionsUtil.IsStringLiteralExpr(expr) || factory.GetDialect().LanguageKind == CppLanguageKind.CppCx && CppExpressionsUtil.IsStringLiteral(expr) /*@MOD C++/CX*/)
  			{
  				CppCliHandleType cliStringHandleType = factory.GetCliStringHandleType();
  				if (cliStringHandleType != null)
@@ -39,7 +39,39 @@ index 4c7a870f45619042640b3407a0771a5885d5222d..65d1eb409cf7faf23aefceba03fdafb7
  					if (cli_system_object == null)
  					{
  						throw new Exception("one of the args has cli-handle in type, but GlobalNamespace.BuiltinsRefs.cli_system_object is null");
-@@ -1279,7 +1291,7 @@ public struct CppOverloadingCollectionBuilder(CppTypeContext tc, ICppTemplateArg
+@@ -817,6 +829,14 @@ public struct CppOverloadingCollectionBuilder(CppTypeContext tc, ICppTemplateArg
+ 
+ 		public void AddCliStringConcatOverloads(CppOperatorKind opKind, ICppResolvedTypeFactory tf, ref CppSmallList<CppOverloadingCandidate> output)
+ 		{
++			// @MOD C++/CX
++			// MSVC requires every operand of a binary operator with a WinRT enum operand to have that enum type (C3063), so string concatenation never applies.
++			// Otherwise MSVC offers only the String^/String^, String^/Object^ and Object^/String^ built-ins: arithmetic operands must box to Object^ without a prior promotion or conversion.
++			bool isCppCx = tf.GetDialect().LanguageKind == CppLanguageKind.CppCx;
++			if (isCppCx && (myCandidateTypes[0].GetBaseType().IsCliEnum() || myCandidateTypes[1].GetBaseType().IsCliEnum()))
++			{
++				return;
++			}
+ 			CppCliHandleType cliObjectHandleType = tf.GetCliObjectHandleType();
+ 			CppCliHandleType cliStringHandleType = tf.GetCliStringHandleType();
+ 			if (cliObjectHandleType == null || cliStringHandleType == null)
+@@ -826,9 +846,15 @@ public struct CppOverloadingCollectionBuilder(CppTypeContext tc, ICppTemplateArg
+ 			CppQualType cppQualType = new CppQualType(cliObjectHandleType);
+ 			CppQualType cppQualType2 = new CppQualType(cliStringHandleType);
+ 			AddBuiltinCandidate(opKind, cppQualType2, new CppQualType[2] { cppQualType2, cppQualType2 }, ref output);
++			// @MOD C++/CX
++			// MSVC converts a nullptr literal to the type of an opposite String^ operand, leaving only the String^/String^ built-in.
++			if (isCppCx && (CppExpressionsUtil.GetValueIfValueExpression(myArgs[0].GetExpressionThroughParens()) is CppNullptrValue && myCandidateTypes[1].GetBaseType().IsCliStringHandleType() || CppExpressionsUtil.GetValueIfValueExpression(myArgs[1].GetExpressionThroughParens()) is CppNullptrValue && myCandidateTypes[0].GetBaseType().IsCliStringHandleType()))
++			{
++				return;
++			}
+ 			AddBuiltinCandidate(opKind, cppQualType2, new CppQualType[2] { cppQualType2, cppQualType }, ref output);
+ 			AddBuiltinCandidate(opKind, cppQualType2, new CppQualType[2] { cppQualType, cppQualType2 }, ref output);
+-			if (myHasArithmeticOrEnumeralCandidateType)
++			if (myHasArithmeticOrEnumeralCandidateType && !isCppCx /*@MOD C++/CX*/)
+ 			{
+ 				CppQualType[] allPredefinedTypes = CppPredefinedTypes.GetAllPredefinedTypes();
+ 				for (int i = 15; i != 23; i++)
+@@ -1279,7 +1305,7 @@ public struct CppOverloadingCollectionBuilder(CppTypeContext tc, ICppTemplateArg
  				{
  					isInsideDirectInit = (forceAllowExplicitConversions = true);
  				}
@@ -48,7 +80,7 @@ index 4c7a870f45619042640b3407a0771a5885d5222d..65d1eb409cf7faf23aefceba03fdafb7
  				{
  					goto IL_0328;
  				}
-@@ -1413,7 +1425,7 @@ public struct CppOverloadingCollectionBuilder(CppTypeContext tc, ICppTemplateArg
+@@ -1413,7 +1439,7 @@ public struct CppOverloadingCollectionBuilder(CppTypeContext tc, ICppTemplateArg
  				}
  			}
  		}
@@ -57,3 +89,17 @@ index 4c7a870f45619042640b3407a0771a5885d5222d..65d1eb409cf7faf23aefceba03fdafb7
  		{
  			ICppClassResolveEntity resolvedClassOrCliHandleTypeEntity2 = toT.GetResolvedClassOrCliHandleTypeEntity();
  			if (resolvedClassOrCliHandleTypeEntity2 != null && resolvedClassOrCliHandleTypeEntity != resolvedClassOrCliHandleTypeEntity2 && resolvedClassOrCliHandleTypeEntity2.IsCliManagedClass())
+@@ -1629,7 +1655,12 @@ public struct CppOverloadingCollectionBuilder(CppTypeContext tc, ICppTemplateArg
+ 				cppBuiltinOperatorOverloadBuilder.AddUnaryCliEnumMathOverloads(opKind, ref result);
+ 				break;
+ 			}
+-			cppBuiltinOperatorOverloadBuilder.AddBinaryPlusOrMinusPointerOverloads(PointerTypeOps.Instance, opKind, ref result);
++			// @MOD C++/CX
++			// MSVC treats a string literal operand of binary '+' only as Platform::String^, never as a pointer operand.
++			if (myCandidateBuilder.TypeContext.Factory.GetDialect().LanguageKind != CppLanguageKind.CppCx || (!CppExpressionsUtil.IsStringLiteral(args[0]) && !CppExpressionsUtil.IsStringLiteral(args[1])))
++			{
++				cppBuiltinOperatorOverloadBuilder.AddBinaryPlusOrMinusPointerOverloads(PointerTypeOps.Instance, opKind, ref result);
++			}
+ 			cppBuiltinOperatorOverloadBuilder.AddBinaryPlusOrMinusPointerOverloads(CliInteriorPointerTypeOps.Instance, opKind, ref result);
+ 			cppBuiltinOperatorOverloadBuilder.AddGenericBinaryArithmeticOverloads(isComparison: false, opKind, ref result);
+ 			cppBuiltinOperatorOverloadBuilder.AddBinaryCliEnumMathOverloads(opKind, ref result);
