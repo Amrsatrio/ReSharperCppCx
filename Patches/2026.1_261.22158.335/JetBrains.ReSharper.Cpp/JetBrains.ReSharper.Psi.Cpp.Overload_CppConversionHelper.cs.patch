@@ -1,5 +1,5 @@
 diff --git a/JetBrains.ReSharper.Psi.Cpp.Overload/CppConversionHelper.cs b/JetBrains.ReSharper.Psi.Cpp.Overload/CppConversionHelper.cs
-index ccc001bbfc3375374ec0e93f6f3dd0a6cb5832a7..a26d8ad934d6dbf3dfbb19c66a99cd3b8b13dbe1 100644
+index ccc001bbfc3375374ec0e93f6f3dd0a6cb5832a7..2db55a10be7a4187e7411158b76a8c365fbd61f7 100644
 --- a/JetBrains.ReSharper.Psi.Cpp.Overload/CppConversionHelper.cs
 +++ b/JetBrains.ReSharper.Psi.Cpp.Overload/CppConversionHelper.cs
 @@ -41,6 +41,32 @@ public struct CppConversionHelper(in CppTypeContext typeContext, CppConversionPa
@@ -57,7 +57,35 @@ index ccc001bbfc3375374ec0e93f6f3dd0a6cb5832a7..a26d8ad934d6dbf3dfbb19c66a99cd3b
  		{
  			if (!flag)
  			{
-@@ -1045,6 +1075,11 @@ public struct CppConversionHelper(in CppTypeContext typeContext, CppConversionPa
+@@ -550,7 +580,7 @@ public struct CppConversionHelper(in CppTypeContext typeContext, CppConversionPa
+ 			return new CppBadConversionSequence(CppBadConversionSequence.FailureStatus.CVQualifiersMismatch, ReferenceFlag.Lval, objArgNode.Type, cppQualType, objArgNode.Expression);
+ 		}
+ 		CppImplicitConversionKind kind;
+-		if (CppTypesUtil.AreEqualUnqualifiedTypes(objClassT, cppQualType2))
++		if (CppTypesUtil.AreEqualUnqualifiedTypes(objClassT, cppQualType2) || IsCppCxSharedNumericProjection(objClassT, cppQualType2) /*@MOD C++/CX*/)
+ 		{
+ 			kind = CppImplicitConversionKind.Identity;
+ 		}
+@@ -581,6 +611,18 @@ public struct CppConversionHelper(in CppTypeContext typeContext, CppConversionPa
+ 		return CppStandardConversionSequence.CreateConversion(objArgNode.Expression, cppQualType2, new CppStandardConversionPart(cppQualType, CppImplicitConversionKind.Identity), new CppStandardConversionPart(cppQualType, kind), new CppStandardConversionPart(cppQualType, CppImplicitConversionKind.Identity), new CppReferenceBindingInfo((funcRefQual == FuncRefQualifier.Empty) ? CppReferenceBindingInfo.ReferenceBindingKind.DirectBindingToNonRefQualifiedObjectArg : CppReferenceBindingInfo.ReferenceBindingKind.DirectBinding, funcRefQual != FuncRefQualifier.Rval, objArgNode.Category.IsRValue() ? CppReferenceBindingInfo.ReferenceBindingTarget.RValue : CppReferenceBindingInfo.ReferenceBindingTarget.LValue), isDirectInitialization: false);
+ 	}
+ 
++	// @MOD C++/CX
++	// MSVC binds a numeric object argument to the Platform class that projects its representation, for example long to int32 and char32_t to uint32.
++	private bool IsCppCxSharedNumericProjection(CppQualType objClassT, CppQualType objectType)
++	{
++		if (TypeFactory.GetDialect().LanguageKind != CppLanguageKind.CppCx || !objClassT.IsArithmetic() || !objectType.IsArithmetic())
++		{
++			return false;
++		}
++		ICppClassResolveEntity projectedClass = objectType.GetResolvedBoxableCliClassTypeEntity(GetGlobalNamespace());
++		return projectedClass != null && projectedClass == objClassT.GetResolvedBoxableCliClassTypeEntity(GetGlobalNamespace());
++	}
++
+ 	public CppImplicitConversionSequence FromContextualBoolConversion(ICppResolvedExpression from)
+ 	{
+ 		return FromContextualBoolConversion(new CppExpressionInfo(from, CppTypeOf(from)));
+@@ -1045,6 +1087,11 @@ public struct CppConversionHelper(in CppTypeContext typeContext, CppConversionPa
  			}
  			return new CppBadConversionSequence(CppBadConversionSequence.FailureStatus.GeneralFailure, ReferenceFlag.Empty, from.Type, toT, from.Expression);
  		}
@@ -69,7 +97,7 @@ index ccc001bbfc3375374ec0e93f6f3dd0a6cb5832a7..a26d8ad934d6dbf3dfbb19c66a99cd3b
  		if (toT.IsResolvedClassType() && from.Type.IsResolvedClassType())
  		{
  			if (CppTypesUtil.AreEqualUnqualifiedTypes(from.Type, toT))
-@@ -1097,7 +1132,9 @@ public struct CppConversionHelper(in CppTypeContext typeContext, CppConversionPa
+@@ -1097,7 +1144,9 @@ public struct CppConversionHelper(in CppTypeContext typeContext, CppConversionPa
  
  	private bool LanguageIsCLI()
  	{

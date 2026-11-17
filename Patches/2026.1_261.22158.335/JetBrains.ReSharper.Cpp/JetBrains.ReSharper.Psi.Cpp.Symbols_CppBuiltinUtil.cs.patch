@@ -1,5 +1,5 @@
 diff --git a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppBuiltinUtil.cs b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppBuiltinUtil.cs
-index 3d83ab86edb9f587e2dc31b4c98e002e3759f9bb..83a7721c06a98802fa6fc4b8bc4dafd55e607486 100644
+index 3d83ab86edb9f587e2dc31b4c98e002e3759f9bb..cf4efe2fc1dec02a77db894f24ff3a68d27f3336 100644
 --- a/JetBrains.ReSharper.Psi.Cpp.Symbols/CppBuiltinUtil.cs
 +++ b/JetBrains.ReSharper.Psi.Cpp.Symbols/CppBuiltinUtil.cs
 @@ -19,6 +19,20 @@ namespace JetBrains.ReSharper.Psi.Cpp.Symbols;
@@ -36,8 +36,8 @@ index 3d83ab86edb9f587e2dc31b4c98e002e3759f9bb..83a7721c06a98802fa6fc4b8bc4dafd5
 +					AddDeclaratorThroughPack(storage, new CppCxGuidStorageField(storage, new CppQualifiedId("Data3"), CppPredefinedTypes.UShort));
 +					AddDeclaratorThroughPack(storage, new CppCxGuidStorageField(storage, new CppQualifiedId("Data4"),
 +						tf.GetArrayType(CppPredefinedTypes.UChar, CppIntegralValues.Int.Create(8))));
-+					storage.GetOrCreateConstructors(storage.GetEndLocationAnchor()).AddGroupedDeclarator(
-+						CppGenerateImplicitMembersUtil.GenerateDefaultConstructor(storage, tf, null, null));
++					// Give the compiler-provided aggregate the same implicit constructors, assignment operators and destructor as a source-defined struct.
++					CppGenerateImplicitMembersUtil.GenerateImplicitlyGeneratedMembers(storage, storage.GetFileResolveCache());
 +					CreateBuiltinTypedef(globalNs, new CppQualifiedId("__rcGUID_t"), CppGenerateImplicitMembersUtil.CopyParameterType(new CppQualType(builtinsRefs.guid)));
 +				}
  				bool flag = dialect.LanguageKind == CppLanguageKind.CppCli;
@@ -63,7 +63,7 @@ index 3d83ab86edb9f587e2dc31b4c98e002e3759f9bb..83a7721c06a98802fa6fc4b8bc4dafd5
  			}
  			if (dialect.HasGnuBuiltins)
  			{
-@@ -863,6 +903,30 @@ public static class CppBuiltinUtil
+@@ -863,6 +903,36 @@ public static class CppBuiltinUtil
  		};
  	}
  
@@ -76,18 +76,24 @@ index 3d83ab86edb9f587e2dc31b4c98e002e3759f9bb..83a7721c06a98802fa6fc4b8bc4dafd5
 +		return new HashMap<CppNumericTypeKind, ICppClassResolveEntity>
 +		{
 +			{ CppIntTypeKind.BOOL, FindClrClassChild(platformNs, new CppQualifiedId("Boolean")) },
++			{ CppIntTypeKind.CHAR, FindClrClassChild(defaultNs, new CppQualifiedId("int8")) },
 +			{ CppIntTypeKind.SCHAR, FindClrClassChild(defaultNs, new CppQualifiedId("int8")) },
 +			{ CppIntTypeKind.UCHAR, FindClrClassChild(defaultNs, new CppQualifiedId("uint8")) },
++			{ CppIntTypeKind.CHAR8_T, FindClrClassChild(defaultNs, new CppQualifiedId("uint8")) },
 +			{ CppIntTypeKind.WCHAR_T, FindClrClassChild(defaultNs, new CppQualifiedId("char16")) },
 +			{ CppIntTypeKind.CHAR16_T, FindClrClassChild(defaultNs, new CppQualifiedId("char16")) },
++			{ CppIntTypeKind.CHAR32_T, FindClrClassChild(defaultNs, new CppQualifiedId("uint32")) },
 +			{ CppIntTypeKind.SHORT, FindClrClassChild(defaultNs, new CppQualifiedId("int16")) },
 +			{ CppIntTypeKind.USHORT, FindClrClassChild(defaultNs, new CppQualifiedId("uint16")) },
 +			{ CppIntTypeKind.INT, FindClrClassChild(defaultNs, new CppQualifiedId("int32")) },
 +			{ CppIntTypeKind.UINT, FindClrClassChild(defaultNs, new CppQualifiedId("uint32")) },
++			{ CppIntTypeKind.LONG, FindClrClassChild(defaultNs, new CppQualifiedId("int32")) },
++			{ CppIntTypeKind.ULONG, FindClrClassChild(defaultNs, new CppQualifiedId("uint32")) },
 +			{ CppIntTypeKind.LONGLONG, FindClrClassChild(defaultNs, new CppQualifiedId("int64")) },
 +			{ CppIntTypeKind.ULONGLONG, FindClrClassChild(defaultNs, new CppQualifiedId("uint64")) },
 +			{ CppFloatTypeKind.FLOAT, FindClrClassChild(defaultNs, new CppQualifiedId("float32")) },
-+			{ CppFloatTypeKind.DOUBLE, FindClrClassChild(defaultNs, new CppQualifiedId("float64")) }
++			{ CppFloatTypeKind.DOUBLE, FindClrClassChild(defaultNs, new CppQualifiedId("float64")) },
++			{ CppFloatTypeKind.LONGDOUBLE, FindClrClassChild(defaultNs, new CppQualifiedId("float64")) }
 +		};
 +	}
 +

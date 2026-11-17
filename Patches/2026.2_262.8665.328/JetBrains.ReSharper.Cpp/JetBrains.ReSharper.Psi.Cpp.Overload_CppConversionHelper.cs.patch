@@ -1,5 +1,5 @@
 diff --git a/JetBrains.ReSharper.Psi.Cpp.Overload/CppConversionHelper.cs b/JetBrains.ReSharper.Psi.Cpp.Overload/CppConversionHelper.cs
-index 73cb2a7751b89e5642476d750a34a623bc983d3a..1f8ad62ac62ec7d454df9cff7e88ce5a20ac95d5 100644
+index 73cb2a7751b89e5642476d750a34a623bc983d3a..c34311684c4eb504335b312248309b46cdfed451 100644
 --- a/JetBrains.ReSharper.Psi.Cpp.Overload/CppConversionHelper.cs
 +++ b/JetBrains.ReSharper.Psi.Cpp.Overload/CppConversionHelper.cs
 @@ -41,6 +41,32 @@ public struct CppConversionHelper(in CppTypeContext typeContext, CppConversionPa
@@ -57,7 +57,35 @@ index 73cb2a7751b89e5642476d750a34a623bc983d3a..1f8ad62ac62ec7d454df9cff7e88ce5a
  		{
  			if (!flag)
  			{
-@@ -1146,6 +1176,11 @@ public struct CppConversionHelper(in CppTypeContext typeContext, CppConversionPa
+@@ -596,7 +626,7 @@ public struct CppConversionHelper(in CppTypeContext typeContext, CppConversionPa
+ 			return new CppBadConversionSequence(CppBadConversionSequence.FailureStatus.CVQualifiersMismatch, ReferenceFlag.Lval, objArgNode.Type, cppQualType, objArgNode.Expression);
+ 		}
+ 		CppImplicitConversionKind kind;
+-		if (CppTypesUtil.AreEqualUnqualifiedTypes(objClassT, cppQualType2))
++		if (CppTypesUtil.AreEqualUnqualifiedTypes(objClassT, cppQualType2) || IsCppCxSharedNumericProjection(objClassT, cppQualType2) /*@MOD C++/CX*/)
+ 		{
+ 			kind = CppImplicitConversionKind.Identity;
+ 		}
+@@ -627,6 +657,18 @@ public struct CppConversionHelper(in CppTypeContext typeContext, CppConversionPa
+ 		return CppStandardConversionSequence.CreateConversion(objArgNode.Expression, cppQualType2, new CppStandardConversionPart(cppQualType, CppImplicitConversionKind.Identity), new CppStandardConversionPart(cppQualType, kind), new CppStandardConversionPart(cppQualType, CppImplicitConversionKind.Identity), new CppReferenceBindingInfo((funcRefQual == FuncRefQualifier.Empty) ? CppReferenceBindingInfo.ReferenceBindingKind.DirectBindingToNonRefQualifiedObjectArg : CppReferenceBindingInfo.ReferenceBindingKind.DirectBinding, funcRefQual != FuncRefQualifier.Rval, objArgNode.Category.IsRValue() ? CppReferenceBindingInfo.ReferenceBindingTarget.RValue : CppReferenceBindingInfo.ReferenceBindingTarget.LValue), isDirectInitialization: false);
+ 	}
+ 
++	// @MOD C++/CX
++	// MSVC binds a numeric object argument to the Platform class that projects its representation, for example long to int32 and char32_t to uint32.
++	private bool IsCppCxSharedNumericProjection(CppQualType objClassT, CppQualType objectType)
++	{
++		if (TypeFactory.GetDialect().LanguageKind != CppLanguageKind.CppCx || !objClassT.IsArithmetic() || !objectType.IsArithmetic())
++		{
++			return false;
++		}
++		ICppClassResolveEntity projectedClass = objectType.GetResolvedBoxableCliClassTypeEntity(GetGlobalNamespace());
++		return projectedClass != null && projectedClass == objClassT.GetResolvedBoxableCliClassTypeEntity(GetGlobalNamespace());
++	}
++
+ 	public CppImplicitConversionSequence FromContextualBoolConversion(ICppResolvedExpression from)
+ 	{
+ 		return FromContextualBoolConversion(new CppExpressionInfo(from, CppTypeOf(from)), CppPredefinedTypes.Bool);
+@@ -1146,6 +1188,11 @@ public struct CppConversionHelper(in CppTypeContext typeContext, CppConversionPa
  				return CppStandardConversionSequence.CreateDerivedToBaseConversion(from.Expression, from.Type, toT, isDirectInit);
  			}
  		}
@@ -69,7 +97,7 @@ index 73cb2a7751b89e5642476d750a34a623bc983d3a..1f8ad62ac62ec7d454df9cff7e88ce5a
  		if ((isDirectInit && toT.IsCliStringClassType() && from.Type.IsCliStringHandleType()) || ((LanguageIsHLSL() || LanguageIsPSSL()) && toT.IsArray() && CppTypesUtil.AreEqualUnqualifiedTypes(toT, from.Type)))
  		{
  			return CppStandardConversionSequence.CreateConversion(from.Expression, from.Type, new CppStandardConversionPart(from.Type, CppImplicitConversionKind.Identity), new CppStandardConversionPart(toT, CppImplicitConversionKind.Identity), new CppStandardConversionPart(toT, CppImplicitConversionKind.Identity), myParams.AllowExplicitConversions);
-@@ -1183,7 +1218,9 @@ public struct CppConversionHelper(in CppTypeContext typeContext, CppConversionPa
+@@ -1183,7 +1230,9 @@ public struct CppConversionHelper(in CppTypeContext typeContext, CppConversionPa
  
  	private bool LanguageIsCLI()
  	{
