@@ -1,9 +1,9 @@
 diff --git a/JetBrains.ReSharper.Psi.Cpp.Caches/CppCxPlatformReferenceProvider.cs b/JetBrains.ReSharper.Psi.Cpp.Caches/CppCxPlatformReferenceProvider.cs
 new file mode 100644
-index 0000000000000000000000000000000000000000..918f4e97d0598d2ea78d75b646de77c8c1af0f7b
+index 0000000000000000000000000000000000000000..c155dbaf1af8007f9c0c54e0d5df4bed5b08661b
 --- /dev/null
 +++ b/JetBrains.ReSharper.Psi.Cpp.Caches/CppCxPlatformReferenceProvider.cs
-@@ -0,0 +1,188 @@
+@@ -0,0 +1,201 @@
 +// @MOD C++/CX
 +
 +using System;
@@ -167,15 +167,28 @@ index 0000000000000000000000000000000000000000..918f4e97d0598d2ea78d75b646de77c8
 +			return modules.Count == 0 ? references : AppendForcedReferences(references, modules);
 +		}
 +
-+		private static IEnumerable<IPsiModuleReference> AppendForcedReferences(IEnumerable<IPsiModuleReference> references, IEnumerable<IPsiModule> forcedModules)
++		// The active configuration's /FU WinMDs are the metadata MSVC compiles against. A project reference can still resolve to a same-named WinMD from another
++		// configuration's output (Rider binds the identical WinRT identity to an already loaded copy after a platform switch), which would expose every type twice.
++		private static IEnumerable<IPsiModuleReference> AppendForcedReferences(IEnumerable<IPsiModuleReference> references, List<IPsiModule> forcedModules)
 +		{
-+			var referencedModules = new HashSet<IPsiModule>();
-+			var referencedPaths = new HashSet<VirtualFileSystemPath>();
++			HashSet<IPsiModule> forcedModuleSet = new HashSet<IPsiModule>(forcedModules);
++			HashSet<string> forcedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
++			foreach (IPsiModule module in forcedModules)
++			{
++				if (module is IAssemblyPsiModule forcedAssemblyModule)
++					forcedNames.Add(forcedAssemblyModule.Assembly.AssemblyName.Name);
++			}
++			HashSet<IPsiModule> referencedModules = new HashSet<IPsiModule>();
++			HashSet<VirtualFileSystemPath> referencedPaths = new HashSet<VirtualFileSystemPath>();
 +			foreach (IPsiModuleReference reference in references)
 +			{
-+				referencedModules.Add(reference.Module);
 +				if (reference.Module is IAssemblyPsiModule assemblyModule)
++				{
++					if (!forcedModuleSet.Contains(assemblyModule) && forcedNames.Contains(assemblyModule.Assembly.AssemblyName.Name))
++						continue;
 +					referencedPaths.Add(assemblyModule.Assembly.Location?.AssemblyPhysicalPath);
++				}
++				referencedModules.Add(reference.Module);
 +				yield return reference;
 +			}
 +			foreach (IPsiModule module in forcedModules)
